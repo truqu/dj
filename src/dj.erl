@@ -1,11 +1,24 @@
 -module(dj).
 
 %% API
--export([]).
+-export([ object/1
+        ]
+       ).
 
 %%%-----------------------------------------------------------------------------
 %%% API
 %%%-----------------------------------------------------------------------------
+
+-spec object(binary()) -> {ok, map()} | error.
+object(Json) ->
+  try
+    case jsx:decode(Json, [return_maps]) of
+      M = #{} -> {ok, M};
+      _       -> error
+    end
+  catch
+    error:_ -> error
+  end.
 
 %%%-----------------------------------------------------------------------------
 %%% Internal functions
