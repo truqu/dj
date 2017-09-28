@@ -1,0 +1,16 @@
+%% -*- mode: erlang -*-
+
+{ application
+, dj
+, [ {description, "Library for decoding JSON"}
+  , {vsn, "0.1.0"}
+  , {modules, []}
+  , {registered, []}
+  , {applications, [ kernel
+                   , stdlib
+                   , jsx
+                   ]
+    }
+  , {env,[]}
+  ]
+}.
