@@ -18,7 +18,6 @@
 decode(Json, Decoders) ->
   (compose(Decoders))(Json).
 
--spec object(binary()) -> {ok, map()} | error.
 object(Json) ->
   try
     case jsx:decode(Json, [return_maps]) of
@@ -29,7 +28,6 @@ object(Json) ->
     error:_ -> error
   end.
 
--spec array(binary()) -> {ok, [any()]}.
 array(Json) ->
   try
     case jsx:decode(Json, [return_maps]) of
