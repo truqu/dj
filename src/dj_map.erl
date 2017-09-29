@@ -8,6 +8,7 @@
 -export([ keys_as_atoms/0
         , is_key/1
         , value_isa/2
+        , put_default/2
         ]
        ).
 
@@ -45,6 +46,14 @@ value_isa(K, P) ->
         false -> error;
         true  -> {ok, M}
       end;
+    (_) ->
+      error
+  end.
+
+put_default(K, D) ->
+  fun
+    ({ok, M})  when is_map(M) ->
+      {ok, maps:put(K, maps:get(K, M, D), M)};
     (_) ->
       error
   end.

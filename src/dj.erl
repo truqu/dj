@@ -62,11 +62,13 @@ compose(F, G) ->
 decode_object_test() ->
   %% Test simple case
   J = <<"{\"foo\": 42}">>,
-  M = #{foo => 42},
+  M = #{foo => 42, bar => -23},
   {ok, M} = dj:decode(J, [ dj:object()
                          , dj_map:keys_as_atoms()
                          , dj_map:is_key(foo)
                          , dj_map:value_isa(foo, dj_int:is_pos())
+                         , dj_map:put_default(bar, -23)
+                         , dj_map:value_isa(bar, dj_int:is_neg())
                          ]
                      ),
   %% Test error case: invalid JSON
