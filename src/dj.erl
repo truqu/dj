@@ -61,16 +61,21 @@ compose(F, G) ->
 
 decode_object_test() ->
   %% Test simple case
-  J = <<"{\"foo\": 42}">>,
-  M = #{foo => 42, bar => -23},
-  {ok, M} = dj:decode(J, [ dj:object()
-                         , dj_map:keys_as_atoms()
-                         , dj_map:is_key(foo)
-                         , dj_map:value_isa(foo, dj_int:is_pos())
-                         , dj_map:put_default(bar, -23)
-                         , dj_map:value_isa(bar, dj_int:is_neg())
-                         ]
-                     ),
+  J = <<"{\"foo\": 42, \"date\": \"2001-01-01\"}">>,
+  M = #{foo => 42, bar => -23, date => {2001,1,1}},
+  {ok, M} =
+    dj:decode(
+      J,
+      [ dj:object()
+      , dj_map:keys_as_atoms()
+      , dj_map:is_key(foo)
+      , dj_map:value_isa(foo, dj_int:is_pos())
+      , dj_map:put_default(bar, -23)
+      , dj_map:value_isa(bar, dj_int:is_neg())
+      , dj_map:value_isa(date, dj_datetime:is_full_date(rfc3339))
+      , dj_map:update_with(date, dj_datetime:full_date_to_tuple(rfc3339))
+      ]
+     ),
   %% Test error case: invalid JSON
   error = dj:decode(<<>>, [dj:object(), dj_map:keys_as_atoms()]),
   %% Test error case: valid JSON, but not an object

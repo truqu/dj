@@ -9,6 +9,7 @@
         , is_key/1
         , value_isa/2
         , put_default/2
+        , update_with/2
         ]
        ).
 
@@ -54,6 +55,14 @@ put_default(K, D) ->
   fun
     ({ok, M})  when is_map(M) ->
       {ok, maps:put(K, maps:get(K, M, D), M)};
+    (_) ->
+      error
+  end.
+
+update_with(K, F) ->
+  fun
+    ({ok, M})  when is_map(M) ->
+      {ok, maps:update_with(K, F, M)};
     (_) ->
       error
   end.

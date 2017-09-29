@@ -6,6 +6,7 @@
 
 %% API
 -export([ is_full_date/1
+        , full_date_to_tuple/1
         ]
        ).
 
@@ -28,6 +29,14 @@ is_full_date(rfc3339) ->
       false
   end.
 
+full_date_to_tuple(rfc3339) ->
+  RE =  <<"^([0-9]+)-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])$">>,
+  fun (B) ->
+      {match, [Y, M, D]} = re:run(B, RE, [{capture, all_but_first, binary}]),
+      ToInt = fun erlang:binary_to_integer/1,
+      {ToInt(Y), ToInt(M), ToInt(D)}
+  end.
+
 %%%-----------------------------------------------------------------------------
 %%% Tests
 %%%-----------------------------------------------------------------------------
@@ -42,6 +51,12 @@ is_full_date_test() ->
   false = P(<<"2017-02-31">>),
   false = P(<<"invalid">>),
   false = P("not a binary"),
+  %% Done
+  ok.
+
+full_date_to_tuple_test() ->
+  %% Test
+  {2018, 4, 1} = (full_date_to_tuple(rfc3339))(<<"2018-04-01">>),
   %% Done
   ok.
 
