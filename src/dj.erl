@@ -6,8 +6,8 @@
 
 %% API
 -export([ decode/2
-        , object/1
-        , array/1
+        , object/0
+        , array/0
         ]
        ).
 
@@ -18,25 +18,29 @@
 decode(Json, Decoders) ->
   (compose(Decoders))(Json).
 
-object(Json) ->
-  try
-    case jsx:decode(Json, [return_maps]) of
-      M = #{} -> {ok, M};
-      _       -> error
-    end
-  catch
-    error:_ -> error
+object() ->
+  fun (Json) ->
+      try
+        case jsx:decode(Json, [return_maps]) of
+          M = #{} -> {ok, M};
+          _       -> error
+        end
+      catch
+        error:_ -> error
+      end
   end.
 
-array(Json) ->
-  try
-    case jsx:decode(Json, [return_maps]) of
-      []        -> {ok, []};
-      L = [_|_] -> {ok, L};
-      _         -> error
-    end
-  catch
-    error:_ -> error
+array() ->
+  fun(Json) ->
+      try
+        case jsx:decode(Json, [return_maps]) of
+          []        -> {ok, []};
+          L = [_|_] -> {ok, L};
+          _         -> error
+        end
+      catch
+        error:_ -> error
+      end
   end.
 
 %%%-----------------------------------------------------------------------------
@@ -59,15 +63,15 @@ decode_object_test() ->
   %% Test simple case
   J = <<"{\"foo\": 42}">>,
   M = #{foo => 42},
-  {ok, M} = dj:decode(J, [ fun dj:object/1
-                         , fun dj_map:keys_as_atoms/1
+  {ok, M} = dj:decode(J, [ dj:object()
+                         , dj_map:keys_as_atoms()
                          , dj_map:has_key(foo)
                          ]
                      ),
   %% Test error case: invalid JSON
-  error = dj:decode(<<>>, [fun dj:object/1, fun dj_map:keys_as_atoms/1]),
+  error = dj:decode(<<>>, [dj:object(), dj_map:keys_as_atoms()]),
   %% Test error case: valid JSON, but not an object
-  error = dj:decode(<<"[1, 2, 3]">>, [fun dj:object/1]),
+  error = dj:decode(<<"[1, 2, 3]">>, [dj:object()]),
   %% Done
   ok.
 
@@ -75,13 +79,13 @@ decode_array_test() ->
   %% Test simple case
   J = <<"[1, 2, 3]">>,
   L = [1, 2, 3],
-  {ok, L} = dj:decode(J, [fun dj:array/1]),
+  {ok, L} = dj:decode(J, [dj:array()]),
   %% Test empty array
-  {ok, []} = dj:decode(<<"[]">>, [fun dj:array/1]),
+  {ok, []} = dj:decode(<<"[]">>, [dj:array()]),
   %% Test error case: invalid JSON
-  error = dj:decode(<<>>, [fun dj:array/1]),
+  error = dj:decode(<<>>, [dj:array()]),
   %% Test error case: valid JSON, but not an array
-  error = dj:decode(<<"{}">>, [fun dj:array/1]),
+  error = dj:decode(<<"{}">>, [dj:array()]),
   %% Done
   ok.
 

@@ -5,7 +5,7 @@
 -endif.
 
 %% API
--export([ keys_as_atoms/1
+-export([ keys_as_atoms/0
         , has_key/1
         ]
        ).
@@ -14,13 +14,16 @@
 %%% API
 %%%-----------------------------------------------------------------------------
 
-keys_as_atoms({ok, M}) when is_map(M) ->
-  { ok
-  , maps:from_list(
-      [{erlang:binary_to_atom(K, utf8), V} || {K,V} <- maps:to_list(M)])
-  };
-keys_as_atoms(_) ->
-  error.
+keys_as_atoms() ->
+  fun
+    ({ok, M}) when is_map(M) ->
+      { ok
+      , maps:from_list(
+          [{erlang:binary_to_atom(K, utf8), V} || {K,V} <- maps:to_list(M)])
+      };
+    (_) ->
+      error
+  end.
 
 has_key(K) ->
   fun
@@ -43,7 +46,7 @@ keys_as_atoms_test() ->
   %% Test simple case
   M1 = #{ <<"foo">> => 23, <<"bar">> => 42},
   M2 = #{ foo => 23, bar => 42},
-  {ok, M2} = keys_as_atoms({ok, M1}),
+  {ok, M2} = (keys_as_atoms())({ok, M1}),
   %% Done
   ok.
 
