@@ -61,7 +61,15 @@ decode_object_test() ->
   %% Test simple case
   J = <<"{\"foo\": 42}">>,
   M = #{foo => 42},
-  {ok, M} = dj:decode(J, [fun dj:object/1, fun dj_map:keys_as_atoms/1]),
+  {ok, M} = dj:decode(J, [ fun dj:object/1
+                         , fun dj_map:keys_as_atoms/1
+                         , dj_map:has_key(foo)
+                         ]
+                     ),
+  %% Test error case: invalid JSON
+  error = dj:decode(<<>>, [fun dj:object/1, fun dj_map:keys_as_atoms/1]),
+  %% Test error case: valid JSON, but not an object
+  error = dj:decode(<<"[1, 2, 3]">>, [fun dj:object/1]),
   %% Done
   ok.
 
@@ -70,6 +78,12 @@ decode_array_test() ->
   J = <<"[1, 2, 3]">>,
   L = [1, 2, 3],
   {ok, L} = dj:decode(J, [fun dj:array/1]),
+  %% Test empty array
+  {ok, []} = dj:decode(<<"[]">>, [fun dj:array/1]),
+  %% Test error case: invalid JSON
+  error = dj:decode(<<>>, [fun dj:array/1]),
+  %% Test error case: valid JSON, but not an array
+  error = dj:decode(<<"{}">>, [fun dj:array/1]),
   %% Done
   ok.
 

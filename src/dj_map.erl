@@ -6,6 +6,7 @@
 
 %% API
 -export([ keys_as_atoms/1
+        , has_key/1
         ]
        ).
 
@@ -20,6 +21,17 @@ keys_as_atoms({ok, M}) when is_map(M) ->
   };
 keys_as_atoms(_) ->
   error.
+
+has_key(K) ->
+  fun
+    ({ok, M})  when is_map(M) ->
+      case maps:is_key(K, M) of
+        false -> error;
+        true  -> {ok, M}
+      end;
+    (_) ->
+      error
+  end.
 
 %%%-----------------------------------------------------------------------------
 %%% Tests
