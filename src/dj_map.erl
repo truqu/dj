@@ -18,11 +18,12 @@
 %%%-----------------------------------------------------------------------------
 
 keys_as_atoms() ->
+  ToAtom = dj:to_atom(),
   fun
     ({ok, M}) when is_map(M) ->
       { ok
       , maps:from_list(
-          [{erlang:binary_to_atom(K, utf8), V} || {K,V} <- maps:to_list(M)])
+          [{ToAtom(K), V} || {K,V} <- maps:to_list(M)])
       };
     (_) ->
       error

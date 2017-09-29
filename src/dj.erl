@@ -8,6 +8,7 @@
 -export([ decode/2
         , object/0
         , array/0
+        , to_atom/0
         ]
        ).
 
@@ -41,6 +42,24 @@ array() ->
       catch
         error:_ -> error
       end
+  end.
+
+to_atom() ->
+  fun
+    (true) ->
+      true;
+    (false) ->
+      false;
+    (null) ->
+      null;
+    (X) when is_integer(X) ->
+      erlang:integer_to_binary(erlang:binary_to_atom(X, utf8));
+    (X) when is_float(X) ->
+      erlang:float_to_binary(erlang:binary_to_atom(X, utf8));
+    (X) when is_binary(X) ->
+      erlang:binary_to_atom(X, utf8);
+    (X) when is_atom(X) ->
+      X
   end.
 
 %%%-----------------------------------------------------------------------------
