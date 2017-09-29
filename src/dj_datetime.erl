@@ -17,9 +17,12 @@ is_full_date(rfc3339) ->
   RE =  <<"^([0-9]+)-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])$">>,
   fun
     (B) when is_binary(B) ->
-      case re:run(B, RE, [{capture, none}]) of
-        match   -> true;
-        nomatch -> false
+      case re:run(B, RE, [{capture, all_but_first, binary}]) of
+        nomatch ->
+          false;
+        {match, [Y, M, D]} ->
+          ToInt = fun erlang:binary_to_integer/1,
+          calendar:valid_date(ToInt(Y), ToInt(M), ToInt(D))
       end;
     (_) ->
       false
@@ -36,6 +39,7 @@ is_full_date_test() ->
   P = is_full_date(rfc3339),
   %% Test
   true = P(<<"2018-04-01">>),
+  false = P(<<"2017-02-31">>),
   false = P(<<"invalid">>),
   false = P("not a binary"),
   %% Done
