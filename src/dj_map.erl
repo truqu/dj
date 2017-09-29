@@ -7,6 +7,7 @@
 %% API
 -export([ keys_as_atoms/0
         , has_key/1
+        , value_isa/2
         ]
        ).
 
@@ -29,6 +30,18 @@ has_key(K) ->
   fun
     ({ok, M})  when is_map(M) ->
       case maps:is_key(K, M) of
+        false -> error;
+        true  -> {ok, M}
+      end;
+    (_) ->
+      error
+  end.
+
+value_isa(K, P) ->
+  fun
+    ({ok, M})  when is_map(M) ->
+      V = maps:get(K, M),
+      case P(V) of
         false -> error;
         true  -> {ok, M}
       end;

@@ -66,6 +66,7 @@ decode_object_test() ->
   {ok, M} = dj:decode(J, [ dj:object()
                          , dj_map:keys_as_atoms()
                          , dj_map:has_key(foo)
+                         , dj_map:value_isa(foo, dj_int:is_pos())
                          ]
                      ),
   %% Test error case: invalid JSON
