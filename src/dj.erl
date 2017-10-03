@@ -8,6 +8,7 @@
 -export([ decode/2
         , object/0
         , array/0
+        , one_of/1
         , to_atom/0
         ]
        ).
@@ -43,6 +44,9 @@ array() ->
         error:_ -> error
       end
   end.
+
+one_of(L) ->
+  fun (X) -> lists:member(X, L) end.
 
 to_atom() ->
   fun
@@ -80,8 +84,8 @@ compose(F, G) ->
 
 decode_object_test() ->
   %% Test simple case
-  J = <<"{\"foo\": 42, \"date\": \"2001-01-01\"}">>,
-  M = #{foo => 42, bar => -23, date => {2001,1,1}},
+  J = <<"{\"foo\": 42, \"date\": \"2001-01-01\", \"baz\": \"quux\"}">>,
+  M = #{foo => 42, bar => -23, date => {2001,1,1}, baz => quux},
   {ok, M} =
     dj:decode(
       J,
@@ -93,6 +97,8 @@ decode_object_test() ->
       , dj_map:value_isa(bar, dj_int:is_neg())
       , dj_map:value_isa(date, dj_datetime:is_full_date(rfc3339))
       , dj_map:update_with(date, dj_datetime:full_date_to_tuple(rfc3339))
+      , dj_map:value_isa(baz, dj:one_of([<<"quux">>, <<"quuux">>]))
+      , dj_map:update_with(baz, dj:to_atom())
       ]
      ),
   %% Test error case: invalid JSON
