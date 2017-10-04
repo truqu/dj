@@ -8,7 +8,10 @@
 -export([ decode/2
         , object/0
         , array/0
+        , is_text/0
+        , is_email/0
         , one_of/1
+        , list_of/1
         , to_atom/0
         ]
        ).
@@ -45,8 +48,25 @@ array() ->
       end
   end.
 
+is_text() ->
+  fun (X) -> erlang:is_binary(X) end.
+
+is_email() ->
+  fun
+    (T) when is_binary(T) ->
+      match == re:run( T
+                     , <<"^[^@\s]+@([^.@\s]{2,}\.){1,}[a-z]{2,}$">>
+                     , [{capture, none}]
+                     );
+    (_) ->
+      false
+  end.
+
 one_of(L) ->
   fun (X) -> lists:member(X, L) end.
+
+list_of(P) ->
+  fun (L) -> lists:all(P, L) end.
 
 to_atom() ->
   fun
@@ -84,8 +104,8 @@ compose(F, G) ->
 
 decode_object_test() ->
   %% Test simple case
-  J = <<"{\"foo\": 42, \"date\": \"2001-01-01\", \"baz\": \"quux\"}">>,
-  M = #{foo => 42, bar => -23, date => {2001,1,1}, baz => quux},
+  J = <<"{\"foo\": 42, \"date\": \"2001-01-01\", \"baz\": \"quux\", \"scores\": [1,2,3]}">>,
+  M = #{foo => 42, bar => -23, date => {2001,1,1}, baz => quux, scores => [1,2,3]},
   {ok, M} =
     dj:decode(
       J,
@@ -95,10 +115,14 @@ decode_object_test() ->
       , dj_map:value_isa(foo, dj_int:is_pos())
       , dj_map:put_default(bar, -23)
       , dj_map:value_isa(bar, dj_int:is_neg())
+      , dj_map:is_key(date)
       , dj_map:value_isa(date, dj_datetime:is_full_date(rfc3339))
       , dj_map:update_with(date, dj_datetime:full_date_to_tuple(rfc3339))
+      , dj_map:is_key(baz)
       , dj_map:value_isa(baz, dj:one_of([<<"quux">>, <<"quuux">>]))
       , dj_map:update_with(baz, dj:to_atom())
+      , dj_map:is_key(scores)
+      , dj_map:value_isa(scores, dj:list_of(dj_int:is_pos()))
       ]
      ),
   %% Test error case: invalid JSON
@@ -106,6 +130,10 @@ decode_object_test() ->
   %% Test error case: valid JSON, but not an object
   error = dj:decode(<<"[1, 2, 3]">>, [dj:object()]),
   %% Done
+  ok.
+
+is_email_test() ->
+  true = (is_email())(<<"michel.rijnders+2@gmx.co.uk">>),
   ok.
 
 decode_array_test() ->
