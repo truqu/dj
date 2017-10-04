@@ -28,10 +28,14 @@ is_v4() ->
 %%% Tests
 %%%-----------------------------------------------------------------------------
 
+-ifdef(TEST).
+
 is_v4_test() ->
   true = (is_v4())(<<"2e2d65cb-437e-4abf-a7e8-7d97ad9d37a8">>),
   false = (is_v4())(<<"42c1f4f4-a81c-11e7-abc4-cec278b6b50a">>),
   ok.
+
+-endif.
 
 %% Local variables:
 %% mode: erlang
