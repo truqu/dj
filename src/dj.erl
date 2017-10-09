@@ -110,23 +110,23 @@ decode_object_test() ->
     dj:decode(
       J,
       [ dj:object()
-      , dj_map:keys_as_atoms()
-      , dj_map:is_key(foo)
-      , dj_map:value_isa(foo, dj_int:is_pos())
-      , dj_map:put_default(bar, -23)
-      , dj_map:value_isa(bar, dj_int:is_neg())
-      , dj_map:is_key(date)
-      , dj_map:value_isa(date, dj_datetime:is_full_date(rfc3339))
-      , dj_map:update_with(date, dj_datetime:full_date_to_tuple(rfc3339))
-      , dj_map:is_key(baz)
-      , dj_map:value_isa(baz, dj:one_of([<<"quux">>, <<"quuux">>]))
-      , dj_map:update_with(baz, dj:to_atom())
-      , dj_map:is_key(scores)
-      , dj_map:value_isa(scores, dj:list_of(dj_int:is_pos()))
+      , dj_maps:keys_as_atoms()
+      , dj_maps:is_key(foo)
+      , dj_maps:value_isa(foo, dj_int:is_pos())
+      , dj_maps:put_default(bar, -23)
+      , dj_maps:value_isa(bar, dj_int:is_neg())
+      , dj_maps:is_key(date)
+      , dj_maps:value_isa(date, dj_datetime:is_full_date(rfc3339))
+      , dj_maps:update_with(date, dj_datetime:full_date_to_tuple(rfc3339))
+      , dj_maps:is_key(baz)
+      , dj_maps:value_isa(baz, dj:one_of([<<"quux">>, <<"quuux">>]))
+      , dj_maps:update_with(baz, dj:to_atom())
+      , dj_maps:is_key(scores)
+      , dj_maps:value_isa(scores, dj:list_of(dj_int:is_pos()))
       ]
      ),
   %% Test error case: invalid JSON
-  error = dj:decode(<<>>, [dj:object(), dj_map:keys_as_atoms()]),
+  error = dj:decode(<<>>, [dj:object(), dj_maps:keys_as_atoms()]),
   %% Test error case: valid JSON, but not an object
   error = dj:decode(<<"[1, 2, 3]">>, [dj:object()]),
   %% Done

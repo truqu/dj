@@ -1,4 +1,4 @@
--module(dj_map).
+-module(dj_maps).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
