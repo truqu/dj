@@ -36,7 +36,7 @@ object() ->
   end.
 
 array() ->
-  fun(Json) ->
+  fun (Json) ->
       try
         case jsx:decode(Json, [return_maps]) of
           []        -> {ok, []};
