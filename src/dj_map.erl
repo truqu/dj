@@ -5,7 +5,8 @@
 -endif.
 
 %% API
--export([ keys_as_atoms/0
+-export([ keys_to_atoms/0
+        , keys_as_atoms/0
         , is_key/1
         , value_isa/2
         , put_default/2
@@ -17,16 +18,16 @@
 %%% API
 %%%-----------------------------------------------------------------------------
 
+keys_to_atoms() ->
+  fun (M) when is_map(M) ->
+      ToMap = dj:to_atom(),
+      maps:from_list([{ToMap(K), V} || {K,V} <- maps:to_list(M)])
+  end.
+
 keys_as_atoms() ->
-  ToAtom = dj:to_atom(),
   fun
-    ({ok, M}) when is_map(M) ->
-      { ok
-      , maps:from_list(
-          [{ToAtom(K), V} || {K,V} <- maps:to_list(M)])
-      };
-    (_) ->
-      error
+    ({ok, M}) when is_map(M) -> {ok, (keys_to_atoms())(M)};
+    (_)                      -> error
   end.
 
 is_key(K) ->
