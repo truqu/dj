@@ -7,6 +7,8 @@
 %% API
 -export([ is_neg/0
         , is_pos/0
+        , is_pos_or_infinite/0
+        , to_int_or_infinite/0
         ]
        ).
 
@@ -29,6 +31,27 @@ is_pos() ->
     (_) ->
       false
   end.
+
+is_pos_or_infinite() ->
+  fun
+    (N) when is_integer(N) ->
+      N > 0;
+    (N) when is_binary(N) ->
+      N == <<"infinite">>;
+    (_) ->
+      false
+  end.
+
+to_int_or_infinite() ->
+  fun
+    (N) when is_binary(N) ->
+      erlang:display({binary, N}),
+      infinite;
+    (N) ->
+      erlang:display({non_binary, N}),
+      N
+  end.
+
 
 %%%-----------------------------------------------------------------------------
 %%% Tests
