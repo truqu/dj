@@ -10,6 +10,8 @@
         , array/0
         , is_text/0
         , is_email/0
+        , any/1
+        , equals/1
         , one_of/1
         , list_of/1
         , to_atom/0
@@ -62,6 +64,14 @@ is_email() ->
       false
   end.
 
+any(L) when is_list(L) ->
+  fun (X) ->
+      lists:any(fun id/1, sequence(L, X))
+  end.
+
+equals(X) ->
+  fun (Y) -> X =:= Y end.
+
 one_of(L) ->
   fun (X) -> lists:member(X, L) end.
 
@@ -95,6 +105,17 @@ compose(Fs) when is_list(Fs) ->
 
 compose(F, G) ->
   fun (X) -> F(G(X)) end.
+
+sequence(Fs, X) ->
+  sequence(Fs, X, []).
+
+sequence([], _, Ys) ->
+  lists:reverse(Ys);
+sequence([F | Fs], X, Ys) ->
+  sequence(Fs, X, [F(X) | Ys]).
+
+id(X) ->
+  X.
 
 %%%-----------------------------------------------------------------------------
 %%% Tests
@@ -147,6 +168,16 @@ decode_array_test() ->
   error = dj:decode(<<>>, [dj:array()]),
   %% Test error case: valid JSON, but not an array
   error = dj:decode(<<"{}">>, [dj:array()]),
+  %% Done
+  ok.
+
+any_test() ->
+  %% Test simple case
+  Any = any([equals(foo), equals(bar), equals(42)]),
+  true = Any(foo),
+  true = Any(bar),
+  true = Any(42),
+  false = Any(23),
   %% Done
   ok.
 
