@@ -7,7 +7,9 @@
 %% API
 -export([ decode/2
         , object/0
+        , object/1
         , array/0
+        , array/1
         , is_text/0
         , is_email/0
         , any/1
@@ -26,9 +28,12 @@ decode(Json, Decoders) ->
   (compose(Decoders))(Json).
 
 object() ->
+  object([]).
+
+object(Opts) ->
   fun (Json) ->
       try
-        case jsx:decode(Json, [return_maps]) of
+        case jsx:decode(Json, [return_maps] ++ Opts) of
           M = #{} -> {ok, M};
           _       -> error
         end
@@ -38,9 +43,12 @@ object() ->
   end.
 
 array() ->
+  array([]).
+
+array(Opts) ->
   fun (Json) ->
       try
-        case jsx:decode(Json, [return_maps]) of
+        case jsx:decode(Json, [return_maps] ++ Opts) of
           []        -> {ok, []};
           L = [_|_] -> {ok, L};
           _         -> error
@@ -130,8 +138,7 @@ decode_object_test() ->
   {ok, M} =
     dj:decode(
       J,
-      [ dj:object()
-      , dj_maps:keys_as_atoms()
+      [ dj:object([{labels, atom}])
       , dj_maps:is_key(foo)
       , dj_maps:value_isa(foo, dj_int:is_pos())
       , dj_maps:put_default(bar, -23)
@@ -147,7 +154,7 @@ decode_object_test() ->
       ]
      ),
   %% Test error case: invalid JSON
-  error = dj:decode(<<>>, [dj:object(), dj_maps:keys_as_atoms()]),
+  error = dj:decode(<<>>, [dj:object()]),
   %% Test error case: valid JSON, but not an object
   error = dj:decode(<<"[1, 2, 3]">>, [dj:object()]),
   %% Done

@@ -5,9 +5,7 @@
 -endif.
 
 %% API
--export([ keys_to_atoms/0
-        , keys_as_atoms/0
-        , is_key/1
+-export([ is_key/1
         , value_isa/2
         , put_default/2
         , update_with/2
@@ -17,18 +15,6 @@
 %%%-----------------------------------------------------------------------------
 %%% API
 %%%-----------------------------------------------------------------------------
-
-keys_to_atoms() ->
-  fun (M) when is_map(M) ->
-      ToMap = dj:to_atom(),
-      maps:from_list([{ToMap(K), V} || {K,V} <- maps:to_list(M)])
-  end.
-
-keys_as_atoms() ->
-  fun
-    ({ok, M}) when is_map(M) -> {ok, (keys_to_atoms())(M)};
-    (_)                      -> error
-  end.
 
 is_key(K) ->
   fun
@@ -68,22 +54,6 @@ update_with(K, F) ->
     (_) ->
       error
   end.
-
-%%%-----------------------------------------------------------------------------
-%%% Tests
-%%%-----------------------------------------------------------------------------
-
--ifdef(TEST).
-
-keys_as_atoms_test() ->
-  %% Test simple case
-  M1 = #{ <<"foo">> => 23, <<"bar">> => 42},
-  M2 = #{ foo => 23, bar => 42},
-  {ok, M2} = (keys_as_atoms())({ok, M1}),
-  %% Done
-  ok.
-
--endif.
 
 %% Local variables:
 %% mode: erlang
