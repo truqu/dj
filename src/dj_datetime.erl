@@ -20,13 +20,18 @@ is_full_date(rfc3339) ->
     (B) when is_binary(B) ->
       case re:run(B, RE, [{capture, all_but_first, binary}]) of
         nomatch ->
-          false;
+          error;
         {match, [Y, M, D]} ->
           ToInt = fun erlang:binary_to_integer/1,
-          calendar:valid_date(ToInt(Y), ToInt(M), ToInt(D))
+          case calendar:valid_date(ToInt(Y), ToInt(M), ToInt(D)) of
+            true ->
+              {ok, B};
+            false ->
+              error
+          end
       end;
     (_) ->
-      false
+      error
   end.
 
 full_date_to_tuple(rfc3339) ->
@@ -47,10 +52,10 @@ is_full_date_test() ->
   %% Setup
   P = is_full_date(rfc3339),
   %% Test
-  true = P(<<"2018-04-01">>),
-  false = P(<<"2017-02-31">>),
-  false = P(<<"invalid">>),
-  false = P("not a binary"),
+  {ok, _} = P(<<"2018-04-01">>),
+  error = P(<<"2017-02-31">>),
+  error = P(<<"invalid">>),
+  error = P("not a binary"),
   %% Done
   ok.
 

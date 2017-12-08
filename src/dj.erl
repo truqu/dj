@@ -10,6 +10,7 @@
         , object/1
         , array/0
         , array/1
+        , lift/1
         , is_text/0
         , is_email/0
         , any/1
@@ -58,33 +59,43 @@ array(Opts) ->
       end
   end.
 
+lift(F) ->
+  fun (X) ->
+      case F(X) of
+        true ->
+          {ok, X};
+        false ->
+          error
+      end
+  end.
+
 is_text() ->
-  fun (X) -> erlang:is_binary(X) end.
+  lift(fun (X) -> erlang:is_binary(X) end).
 
 is_email() ->
-  fun
-    (T) when is_binary(T) ->
-      match == re:run( T
-                     , <<"^[^@\s]+@([^.@\s]{2,}\.){1,}[a-z]{2,}$">>
-                     , [{capture, none}]
-                     );
-    (_) ->
-      false
-  end.
+  lift(
+    fun
+      (T) when is_binary(T) ->
+        match == re:run( T
+                       , <<"^[^@\s]+@([^.@\s]{2,}\.){1,}[a-z]{2,}$">>
+                       , [{capture, none}]
+                       );
+      (_) ->
+        false
+    end
+   ).
 
 any(L) when is_list(L) ->
-  fun (X) ->
-      lists:any(fun id/1, sequence(L, X))
-  end.
+  lift(fun (X) -> lists:any(fun ok/1, sequence(L, X)) end).
 
 equals(X) ->
-  fun (Y) -> X =:= Y end.
+  lift(fun (Y) -> X =:= Y end).
 
 one_of(L) ->
-  fun (X) -> lists:member(X, L) end.
+  lift(fun (X) -> lists:member(X, L) end).
 
 list_of(P) ->
-  fun (L) -> lists:all(P, L) end.
+  lift(fun (L) -> lists:all(fun ok/1, lists:map(P, L)) end).
 
 to_atom() ->
   fun
@@ -122,8 +133,10 @@ sequence([], _, Ys) ->
 sequence([F | Fs], X, Ys) ->
   sequence(Fs, X, [F(X) | Ys]).
 
-id(X) ->
-  X.
+ok({ok, _}) ->
+  true;
+ok(_) ->
+  false.
 
 %%%-----------------------------------------------------------------------------
 %%% Tests
@@ -161,7 +174,7 @@ decode_object_test() ->
   ok.
 
 is_email_test() ->
-  true = (is_email())(<<"michel.rijnders+2@gmx.co.uk">>),
+  {ok, _} = (is_email())(<<"michel.rijnders+2@gmx.co.uk">>),
   ok.
 
 decode_array_test() ->
@@ -181,10 +194,10 @@ decode_array_test() ->
 any_test() ->
   %% Test simple case
   Any = any([equals(foo), equals(bar), equals(42)]),
-  true = Any(foo),
-  true = Any(bar),
-  true = Any(42),
-  false = Any(23),
+  {ok, _} = Any(foo),
+  {ok, _} = Any(bar),
+  {ok, _} = Any(42),
+  error = Any(23),
   %% Done
   ok.
 
