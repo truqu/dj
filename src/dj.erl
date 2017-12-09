@@ -144,11 +144,11 @@ id(X) ->
 
 decode_object_test() ->
   %% Test simple case
-  J = <<"{\"foo\": 42, \"date\": \"2001-01-01\", \"baz\": \"quux\", \"scores\": [1,2,3]}">>,
+  Json = <<"{\"foo\": 42, \"date\": \"2001-01-01\", \"baz\": \"quux\", \"scores\": [1,2,3]}">>,
   M = #{foo => 42, bar => -23, date => {2001,1,1}, baz => quux, scores => [1,2,3]},
   {ok, M} =
     dj:decode(
-      J,
+      Json,
       [ dj:object([{labels, atom}])
       , dj_maps:is_key(foo)
       , dj_maps:value_isa(foo, dj_int:is_pos())
@@ -177,9 +177,9 @@ is_email_test() ->
 
 decode_array_test() ->
   %% Test simple case
-  J = <<"[1, 2, 3]">>,
+  Json = <<"[1, 2, 3]">>,
   L = [1, 2, 3],
-  {ok, L} = dj:decode(J, [dj:array()]),
+  {ok, L} = dj:decode(Json, [dj:array()]),
   %% Test empty array
   {ok, []} = dj:decode(<<"[]">>, [dj:array()]),
   %% Test error case: invalid JSON
