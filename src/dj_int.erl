@@ -15,24 +15,20 @@
 %%%-----------------------------------------------------------------------------
 
 is_neg() ->
-  dj:lift(
-    fun
-      (N)  when is_integer(N) ->
-        N < 0;
-      (_) ->
-        false
-    end
-   ).
+  fun
+    (N)  when is_integer(N) ->
+      N < 0;
+    (_) ->
+      false
+  end.
 
 is_pos() ->
-  dj:lift(
-    fun
-      (N)  when is_integer(N) ->
-        N > 0;
-      (_) ->
-        false
-    end
-   ).
+  fun
+    (N)  when is_integer(N) ->
+      N > 0;
+    (_) ->
+      false
+  end.
 
 %%%-----------------------------------------------------------------------------
 %%% Tests

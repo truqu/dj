@@ -14,18 +14,15 @@
 %%%-----------------------------------------------------------------------------
 
 is_v4() ->
-  Regex = <<"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$">>,
-  dj:lift(
-    fun
-      (X)  when is_binary(X) ->
-        case re:run(X, Regex) of
-          {match, _} -> true;
-          _          -> false
-        end;
-      (_) ->
-             false
-    end
-   ).
+  fun
+    (X)  when is_binary(X) ->
+      case re:run(X, <<"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$">>) of
+        {match, _} -> true;
+        _          -> false
+      end;
+    (_) ->
+      false
+  end.
 
 %%%-----------------------------------------------------------------------------
 %%% Tests
@@ -34,8 +31,8 @@ is_v4() ->
 -ifdef(TEST).
 
 is_v4_test() ->
-  {ok, _} = (is_v4())(<<"2e2d65cb-437e-4abf-a7e8-7d97ad9d37a8">>),
-  error = (is_v4())(<<"42c1f4f4-a81c-11e7-abc4-cec278b6b50a">>),
+  true = (is_v4())(<<"2e2d65cb-437e-4abf-a7e8-7d97ad9d37a8">>),
+  false = (is_v4())(<<"42c1f4f4-a81c-11e7-abc4-cec278b6b50a">>),
   ok.
 
 -endif.

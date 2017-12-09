@@ -70,32 +70,32 @@ lift(F) ->
   end.
 
 is_text() ->
-  lift(fun (X) -> erlang:is_binary(X) end).
+  fun (X) -> erlang:is_binary(X) end.
 
 is_email() ->
-  lift(
-    fun
-      (T) when is_binary(T) ->
-        match == re:run( T
-                       , <<"^[^@\s]+@([^.@\s]{2,}\.){1,}[a-z]{2,}$">>
-                       , [{capture, none}]
-                       );
-      (_) ->
-        false
-    end
-   ).
+  fun
+    (T) when is_binary(T) ->
+      match == re:run( T
+                     , <<"^[^@\s]+@([^.@\s]{2,}\.){1,}[a-z]{2,}$">>
+                     , [{capture, none}]
+                     );
+    (_) ->
+      false
+  end.
 
 any(L) when is_list(L) ->
-  lift(fun (X) -> lists:any(fun ok/1, sequence(L, X)) end).
+  fun (X) ->
+      lists:any(fun id/1, sequence(L, X))
+  end.
 
 equals(X) ->
-  lift(fun (Y) -> X =:= Y end).
+  fun (Y) -> X =:= Y end.
 
 one_of(L) ->
-  lift(fun (X) -> lists:member(X, L) end).
+  fun (X) -> lists:member(X, L) end.
 
 list_of(P) ->
-  lift(fun (L) -> lists:all(fun ok/1, lists:map(P, L)) end).
+  fun (L) -> lists:all(P, L) end.
 
 to_atom() ->
   fun
@@ -133,10 +133,8 @@ sequence([], _, Ys) ->
 sequence([F | Fs], X, Ys) ->
   sequence(Fs, X, [F(X) | Ys]).
 
-ok({ok, _}) ->
-  true;
-ok(_) ->
-  false.
+id(X) ->
+  X.
 
 %%%-----------------------------------------------------------------------------
 %%% Tests
@@ -174,7 +172,7 @@ decode_object_test() ->
   ok.
 
 is_email_test() ->
-  {ok, _} = (is_email())(<<"michel.rijnders+2@gmx.co.uk">>),
+  true = (is_email())(<<"michel.rijnders+2@gmx.co.uk">>),
   ok.
 
 decode_array_test() ->
@@ -194,10 +192,10 @@ decode_array_test() ->
 any_test() ->
   %% Test simple case
   Any = any([equals(foo), equals(bar), equals(42)]),
-  {ok, _} = Any(foo),
-  {ok, _} = Any(bar),
-  {ok, _} = Any(42),
-  error = Any(23),
+  true = Any(foo),
+  true = Any(bar),
+  true = Any(42),
+  false = Any(23),
   %% Done
   ok.
 

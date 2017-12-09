@@ -32,10 +32,8 @@ value_isa(K, P) ->
     ({ok, M})  when is_map(M) ->
       V = maps:get(K, M),
       case P(V) of
-        {ok, _} ->
-          {ok, M};
-        error ->
-          error
+        false -> error;
+        true  -> {ok, M}
       end;
     (_) ->
       error
