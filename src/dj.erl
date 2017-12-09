@@ -10,7 +10,6 @@
         , object/1
         , array/0
         , array/1
-        , lift/1
         , is_text/0
         , is_email/0
         , any/1
@@ -18,6 +17,7 @@
         , one_of/1
         , list_of/1
         , to_atom/0
+        , lift/1
         ]
        ).
 
@@ -56,16 +56,6 @@ array(Opts) ->
         end
       catch
         error:_ -> error
-      end
-  end.
-
-lift(F) ->
-  fun (X) ->
-      case F(X) of
-        true ->
-          {ok, X};
-        false ->
-          error
       end
   end.
 
@@ -113,6 +103,16 @@ to_atom() ->
       erlang:binary_to_atom(X, utf8);
     (X) when is_atom(X) ->
       X
+  end.
+
+lift(F) ->
+  fun (X) ->
+      case F(X) of
+        true ->
+          {ok, X};
+        false ->
+          error
+      end
   end.
 
 %%%-----------------------------------------------------------------------------
