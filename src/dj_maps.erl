@@ -5,8 +5,10 @@
 -endif.
 
 %% API
--export([ is_key/1
+-export([ %% validation
+          is_key/1
         , value_isa/2
+          %% conversion
         , put_default/2
         , update_with/2
         ]

@@ -5,7 +5,8 @@
 -endif.
 
 %% API
--export([ is_v4/0
+-export([ %% validation
+          is_v4/0
         ]
        ).
 

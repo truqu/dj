@@ -6,17 +6,21 @@
 
 %% API
 -export([ decode/2
+          %% decoding
         , object/0
         , object/1
         , array/0
         , array/1
+          %% validation
         , is_text/0
         , is_email/0
         , any/1
         , equals/1
         , one_of/1
         , list_of/1
+          %% conversion
         , to_atom/0
+          %% utility
         , lift/1
         ]
        ).

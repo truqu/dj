@@ -5,7 +5,9 @@
 -endif.
 
 %% API
--export([ is_full_date/1
+-export([ %% validation
+          is_full_date/1
+          %% conversion
         , full_date_to_tuple/1
         ]
        ).

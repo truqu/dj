@@ -5,7 +5,8 @@
 -endif.
 
 %% API
--export([ map/1
+-export([ %% conversion
+          map/1
         ]
        ).
 
