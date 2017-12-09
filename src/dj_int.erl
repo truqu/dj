@@ -5,7 +5,8 @@
 -endif.
 
 %% API
--export([ is_neg/0
+-export([ %% validation
+          is_neg/0
         , is_pos/0
         ]
        ).
