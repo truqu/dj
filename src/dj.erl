@@ -74,9 +74,7 @@ is_email() ->
   end.
 
 any(L) when is_list(L) ->
-  fun (X) ->
-      lists:any(fun id/1, sequence(L, X))
-  end.
+  fun (X) -> lists:any(fun id/1, sequence(L, X)) end.
 
 equals(X) ->
   fun (Y) -> X =:= Y end.
