@@ -20,6 +20,7 @@
         , list_of/1
           %% conversion
         , to_atom/0
+        , to_existing_atom/0
           %% utility
         , lift/1
         ]
@@ -91,20 +92,26 @@ list_of(P) ->
 
 to_atom() ->
   fun
-    (true) ->
-      true;
-    (false) ->
-      false;
-    (null) ->
-      null;
+    (X) when is_atom(X) ->
+      X;
     (X) when is_integer(X) ->
       erlang:integer_to_binary(erlang:binary_to_atom(X, utf8));
     (X) when is_float(X) ->
       erlang:float_to_binary(erlang:binary_to_atom(X, utf8));
     (X) when is_binary(X) ->
-      erlang:binary_to_atom(X, utf8);
+      erlang:binary_to_atom(X, utf8)
+  end.
+
+to_existing_atom() ->
+  fun
     (X) when is_atom(X) ->
-      X
+      X;
+    (X) when is_integer(X) ->
+      erlang:integer_to_binary(erlang:binary_to_existing_atom(X, utf8));
+    (X) when is_float(X) ->
+      erlang:float_to_binary(erlang:binary_to_existing_atom(X, utf8));
+    (X) when is_binary(X) ->
+      erlang:binary_to_existing_atom(X, utf8)
   end.
 
 lift(F) ->
@@ -161,7 +168,7 @@ decode_object_test() ->
       , dj_maps:update_with(date, dj_datetime:full_date_to_tuple(rfc3339))
       , dj_maps:is_key(baz)
       , dj_maps:value_isa(baz, dj:one_of([<<"quux">>, <<"quuux">>]))
-      , dj_maps:update_with(baz, dj:to_atom())
+      , dj_maps:update_with(baz, dj:to_existing_atom())
       , dj_maps:is_key(scores)
       , dj_maps:value_isa(scores, dj:list_of(dj_int:is_pos()))
       ]
