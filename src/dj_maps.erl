@@ -11,6 +11,8 @@
           %% conversion
         , put_default/2
         , update_with/2
+          %% filter
+        , filter_keys/1
         ]
        ).
 
@@ -20,7 +22,7 @@
 
 is_key(K) ->
   fun
-    ({ok, M})  when is_map(M) ->
+    ({ok, M}) when is_map(M) ->
       case maps:is_key(K, M) of
         false -> error;
         true  -> {ok, M}
@@ -31,7 +33,7 @@ is_key(K) ->
 
 value_isa(K, P) ->
   fun
-    ({ok, M})  when is_map(M) ->
+    ({ok, M}) when is_map(M) ->
       V = maps:get(K, M),
       case P(V) of
         false -> error;
@@ -43,7 +45,7 @@ value_isa(K, P) ->
 
 put_default(K, D) ->
   fun
-    ({ok, M})  when is_map(M) ->
+    ({ok, M}) when is_map(M) ->
       {ok, maps:put(K, maps:get(K, M, D), M)};
     (_) ->
       error
@@ -51,8 +53,16 @@ put_default(K, D) ->
 
 update_with(K, F) ->
   fun
-    ({ok, M})  when is_map(M) ->
+    ({ok, M}) when is_map(M) ->
       {ok, maps:update_with(K, F, M)};
+    (_) ->
+      error
+  end.
+
+filter_keys(Keys) ->
+  fun
+    ({ok, M}) when is_map(M) ->
+      {ok, maps:filter(fun (K, _) -> lists:member(K, Keys) end, M)};
     (_) ->
       error
   end.
