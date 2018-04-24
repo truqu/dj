@@ -153,12 +153,13 @@ id(X) ->
 
 decode_object_test() ->
   %% Test simple case
-  Json = <<"{\"foo\": 42, \"date\": \"2001-01-01\", \"baz\": \"quux\", \"scores\": [1,2,3]}">>,
+  Json = <<"{\"foo\": 42, \"date\": \"2001-01-01\", \"baz\": \"quux\", \"scores\": [1,2,3], \"bad_key\": \"bad_value\"}">>,
   M = #{foo => 42, bar => -23, date => {2001,1,1}, baz => quux, scores => [1,2,3]},
   {ok, M} =
     dj:decode(
       Json,
       [ dj:object([{labels, atom}])
+      , dj_maps:filter_keys([foo, bar, baz, date, scores])
       , dj_maps:is_key(foo)
       , dj_maps:value_isa(foo, dj_int:is_pos())
       , dj_maps:put_default(bar, -23)
