@@ -9,6 +9,7 @@
           is_key/1
         , value_isa/2
           %% conversion
+        , put/2
         , put_default/2
         , update_with/2
           %% filter
@@ -39,6 +40,14 @@ value_isa(K, P) ->
         false -> error;
         true  -> {ok, M}
       end;
+    (_) ->
+      error
+  end.
+
+put(K, V) ->
+  fun
+    ({ok, M}) when is_map(M) ->
+      {ok, maps:put(K, V, M)};
     (_) ->
       error
   end.
