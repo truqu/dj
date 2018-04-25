@@ -154,7 +154,13 @@ id(X) ->
 decode_object_test() ->
   %% Test simple case
   Json = <<"{\"foo\": 42, \"date\": \"2001-01-01\", \"baz\": \"quux\", \"scores\": [1,2,3], \"bad_key\": \"bad_value\"}">>,
-  M = #{foo => 42, bar => -23, date => {2001,1,1}, baz => quux, scores => [1,2,3]},
+  M = #{foo => 42, 
+        bar => -23, 
+        date => {2001,1,1}, 
+        baz => quux, 
+        scores => [1,2,3],
+        hard_set => <<"mine">>
+        },
   {ok, M} =
     dj:decode(
       Json,
@@ -172,6 +178,7 @@ decode_object_test() ->
       , dj_maps:update_with(baz, dj:to_existing_atom())
       , dj_maps:is_key(scores)
       , dj_maps:value_isa(scores, dj:list_of(dj_int:is_pos()))
+      , dj_maps:put(hard_set, <<"mine">>)
       ]
      ),
   %% Test error case: invalid JSON
