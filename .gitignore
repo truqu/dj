@@ -16,3 +16,4 @@ log
 logs
 rebar.lock
 rebar3.crashdump
+doc
