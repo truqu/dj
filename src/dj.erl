@@ -1,149 +1,630 @@
+%% @doc {@module} allows writing composable decoders, combining decoding,
+%% transformation and validation.
 -module(dj).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
-%% API
--export([ decode/2
-          %% decoding
-        , object/0
-        , object/1
-        , array/0
-        , array/1
-          %% validation
-        , is_text/0
-        , is_email/0
-        , any/1
-        , equals/1
+-export([ %% Primitives
+          binary/0
+        , integer/0
+        , pos_integer/0
+        , neg_integer/0
+        , non_neg_integer/0
+        , null/0
+        , null/1
+        , boolean/0
+        , float/0
+        , value/0
+          %% Convenience decoders
+        , email/0
+        , atom/0
+        , atom/1
+        , existing_atom/0
+        , existing_atom/1
+        , full_date_tuple/1
+          %% Objects and maps
+        , field/2
+        , at/2
+        , prop/2
+        , prop_list/1
+        , to_map/1
+          %% Lists
+        , list/1
+        , index/2
+        , sequence/1
+          %% Manipulating decoders
+        , map/2
+        , chain/2
+        , fail/1
+        , succeed/1
+          %% Fancy decoders
+        , mapn/2
+        , exactly/2
         , one_of/1
-        , list_of/1
-          %% conversion
-        , to_atom/0
-        , to_existing_atom/0
-          %% utility
-        , lift/1
-        ]
-       ).
+          %% Running a decoder
+        , decode/2
+        , decode/3
+        ]).
+
+%%%-----------------------------------------------------------------------------
+%%% Types
+%%%-----------------------------------------------------------------------------
+
+-opaque decoder(T) :: fun ((jsx:json_term()) -> result(T, E :: error())).
+
+-type result(V, E) :: {ok, V} | {error, E}.
+
+-type error() :: {unexpected_type, ExpectedType :: type(), jsx:json_term()}
+               | {missing_field, field(), jsx:json_term()}
+               | {missing_index, non_neg_integer(), jsx:json_term()}
+               | {in_field, field(), error()}
+               | {at_index, non_neg_integer(), error()}
+               | {multiple, [error(), ...]}
+               | {custom, any()}
+               | {invalid_json, any()}.
+
+-type type() :: binary 
+              | integer
+              | pos_integer
+              | neg_integer
+              | non_neg_integer
+              | null
+              | boolean
+              | float
+              | map 
+              | list.
+
+-type field() :: atom() | binary().
+
+-export_type([ decoder/1
+             , result/2
+             , error/0
+             , type/0
+             , field/0
+             ]).
 
 %%%-----------------------------------------------------------------------------
 %%% API
 %%%-----------------------------------------------------------------------------
 
-decode(Json, Decoders) ->
-  (compose(Decoders))(Json).
+%% @equiv dj:decode(Json, Decoder, [{labels, existing_atom}])
+-spec decode(Json, decoder(T)) -> result(T, error()) when
+    Json :: jsx:json_text().
+decode(Json, Decoder) ->
+  decode(Json, Decoder, [{labels, existing_atom}]).
 
-object() ->
-  object([]).
+%% @doc Run a {@type decoder(T)} against arbirary JSON.
+%%
+%% The resulting {@type result(T, error())} is either a tuple `{ok, T}' or a
+%% tuple `{error, error()}' where {@type error()} represents whatever went wrong
+%% during the decoding/validation/transformation process.
+%%
+%% `Opts` are passed on to `jsx:decode/2'. The option `return_maps' is always
+%% added by {@module} and does not need to be specified manually.
+%%
+%% Use of the functions that create {@type decoder(T)}s and functions that help
+%% with composition are discussed individually.
+-spec decode(Json, decoder(T), Opts) -> result(T, error()) when
+    Json :: jsx:json_text(),
+    Opts :: [term()].
+decode(Json, Decoder, Opts) ->
+  try
+    V = jsx:decode(Json, [return_maps | Opts]),
+    Decoder(V)
+  catch
+    error:_ -> {error, {invalid_json, Json}}
+  end.
 
-object(Opts) ->
-  fun (Json) ->
-      try
-        case jsx:decode(Json, [return_maps] ++ Opts) of
-          M = #{} -> {ok, M};
-          _       -> error
+%% @doc Decodes a JSON string as a `binary()'.
+%%
+%% ```
+%%    {ok, <<"Hi there">>} = dj:decode(<<"\"Hi there\"">>, dj:binary()).
+%% '''
+%%
+%% If the specified JSON is not a string (it might, for example, be an integer),
+%% this will return an error indicating that an unexpected type was found -
+%% including the actual value that was found instead. This value will be a
+%% `jsx:json_term()'.
+%%
+%% ```
+%%    {error, {unexpected_type, binary, 123}} =
+%%        dj:decode(<<"123">>, dj:binary()).
+%% '''
+-spec binary() -> decoder(binary()).
+binary() ->
+  fun (Json) when is_binary(Json) -> {ok, Json};
+      (Json)                      -> unexpected_type_error(binary, Json)
+  end.
+
+%% @doc Decodes a JSON string as a `binary()' if and only if it looks like an
+%% email address.
+%%
+%% ```
+%%    {ok, <<"ilias@truqu.com">>} =
+%%        dj:decode(<<"\"ilias@truqu.com\"">>, dj:email()).
+%% '''
+%%
+%% If the specified JSON is not a string, this will fail with an
+%% `unexpected_type' error (expecing a `binary'). If the specified JSON is a
+%% string but does not look like an email address, this will fail with a custom
+%% `not_an_email' error.
+%%
+%% ```
+%%    E = {custom, {not_an_email, <<"foo@bar">>}},
+%%    {error, E} = dj:decode(<<"\"foo@bar\"">>, dj:email()).
+%% '''
+-spec email() -> decoder(binary()).
+email() ->
+  chain( binary()
+       , fun (V) ->
+             case re:run( V
+                        , <<"^[^@\s]+@([^.@\s]{2,}\.){1,}[a-z]{2,}$">>
+                        , [{capture, none}]
+                        ) of
+               match -> succeed(V);
+               _     -> fail({not_an_email, V})
+             end
+         end
+       ).
+
+%% @doc Decodes a JSON integer as an `integer()'
+%%
+%% ```
+%%    {ok, 123} = dj:decode(<<"123">>, dj:integer()).
+%%    {error, {unexpected_type, integer, true}} =
+%%        dj:decode(<<"true">>, dj:integer()).
+%% '''
+%%
+%% @see float/0
+%% @see pos_integer/0
+%% @see neg_integer/0
+%% @see non_neg_integer/0
+-spec integer() -> decoder(integer()).
+integer() ->
+  fun (Json) when is_integer(Json) -> {ok, Json};
+      (Json)                       -> unexpected_type_error(integer, Json)
+  end.
+
+%% @doc Decodes a strictly positive JSON integer as a `pos_integer()'
+%%
+%% @see float/0
+%% @see integer/0
+%% @see neg_integer/0
+%% @see non_neg_integer/0
+-spec pos_integer() -> decoder(pos_integer()).
+pos_integer() ->
+  fun (Json) when is_integer(Json), Json > 0 ->
+        {ok, Json};
+      (Json) ->
+        unexpected_type_error(pos_integer, Json)
+  end.
+
+%% @doc Decodes a negative JSON integer as a `neg_integer()'
+%%
+%% @see float/0
+%% @see pos_integer/0
+%% @see integer/0
+%% @see non_neg_integer/0
+-spec neg_integer() -> decoder(neg_integer()).
+neg_integer() ->
+  fun (Json) when is_integer(Json), Json < 0 ->
+        {ok, Json};
+      (Json) ->
+        unexpected_type_error(neg_integer, Json)
+  end.
+
+%% @doc Decodes a positive JSON integer as a `non_neg_integer()'
+%%
+%% @see float/0
+%% @see pos_integer/0
+%% @see neg_integer/0
+%% @see integer/0
+-spec non_neg_integer() -> decoder(non_neg_integer()).
+non_neg_integer() ->
+  fun (Json) when is_integer(Json), Json >= 0 ->
+        {ok, Json};
+      (Json) ->
+        unexpected_type_error(non_neg_integer, Json)
+  end.
+
+%% @doc Decodes a JSON number as a `float()'
+%%
+%% Note that JSON does not have a separate floating point type. As such,
+%% integers in JSON will be cast to floats by this function.
+%%
+%% ```
+%%    {ok, 123.0} = dj:decode(<<"123">>, dj:float()).
+%% '''
+%%
+%% @see integer/0
+%% @see pos_integer/0
+%% @see neg_integer/0
+%% @see non_neg_integer/0
+-spec float() -> decoder(float()).
+float() ->
+  fun (Json) when is_float(Json)   -> {ok, Json};
+      (Json) when is_integer(Json) -> {ok, float(Json)};
+      (Json)                       -> unexpected_type_error(float, Json)
+  end.
+
+%% @doc Decodes `null' into an arbitrary value.
+%%
+%% This can be used to convert `null' to a specific value, like `undefined' or a
+%% default value that makes sense for your application.
+%%
+%% ```
+%%    {ok, foo} = dj:decode(<<"null">>, dj:null(foo)).
+%% '''
+%%
+%% @see null/0
+-spec null(V) -> decoder(V).
+null(V) ->
+  fun (null) -> {ok, V};
+      (Json) -> unexpected_type_error(null, Json)
+  end.
+
+%% @equiv null(null)
+-spec null() -> decoder(null).
+null() ->
+  null(null).
+
+%% @doc Decodes a JSON `true' or `false' to a `boolean()'
+%%
+%% ```
+%%    {ok, true} = dj:decode(<<"true">>, dj:boolean()).
+%%    {ok, false} = dj:decode(<<"false">>, dj:boolean()).
+%%    {error, _} = dj:decode(<<"null">>, dj:boolean()).
+%% '''
+-spec boolean() -> decoder(boolean()).
+boolean() ->
+  fun (Json) when is_boolean(Json) -> {ok, Json};
+      (Json)                       -> unexpected_type_error(boolean, Json)
+  end.
+
+%% @doc Decodes a JSON value to an `atom()'
+%%
+%% If the JSON value is `true', `false' or `null', this returns an erlang atom
+%% `true', `false' or `null'. If the JSON value is a string,
+%% `binary_to_atom(Json, utf8)' is used to turn it into an atom.
+%%
+%% <strong>NOTE</strong>: Be careful with this function, as it may be used to
+%% force erlang to create many, many new atoms, to the point of running out of
+%% memory.
+%%
+%% @see existing_atom/0
+%% @see atom/1
+-spec atom() -> decoder(atom()).
+atom() ->
+  chain( value()
+       , fun (Json) when is_atom(Json)   -> succeed(Json);
+             (Json) when is_binary(Json) -> succeed(binary_to_atom(Json, utf8));
+             (Json)                      -> fail({not_an_atom, Json})
+         end
+       ).
+
+%% @doc Decodes a JSON value to one of a set of predefined atoms
+%%
+%% This is a safer alternative to `atom()', as it not only allows whitelisting
+%% allowed values, but can also prevent creating new atoms.
+-spec atom([atom(), ...]) -> decoder(atom()).
+atom(Allowed) ->
+  one_of(lists:map(fun (A) -> exactly(A, existing_atom()) end, Allowed)).
+
+%% @doc Decodes a JSON value to an existing atom
+%%
+%% Note that Erlang, in some cases, may optimize atoms away. For example, if an
+%% atom is only every used in an `atom_to_binary(some_atom)' call, the
+%% `some_atom' atom may not "exist".
+%%
+%% @see atom/1
+-spec existing_atom() -> decoder(atom()).
+existing_atom() ->
+  AtomizeOrFail =
+    fun(Json) ->
+        try succeed(binary_to_existing_atom(Json, utf8))
+        catch error:badarg ->
+            fail({not_an_atom, Json})
         end
-      catch
-        error:_ -> error
-      end
-  end.
+    end,
+  chain ( value()
+        , fun (Json) when is_atom(Json)   -> succeed(Json);
+              (Json) when is_binary(Json) -> AtomizeOrFail(Json);
+              (Json)                      -> fail({not_an_atom, Json})
+          end
+        ).
 
-array() ->
-  array([]).
+%% @equiv atom(Allowed)
+-spec existing_atom([atom(), ...]) -> decoder(atom()).
+existing_atom(Allowed) ->
+  atom(Allowed).
 
-array(Opts) ->
-  fun (Json) ->
-      try
-        case jsx:decode(Json, [return_maps] ++ Opts) of
-          []        -> {ok, []};
-          L = [_|_] -> {ok, L};
-          _         -> error
+-spec full_date_tuple(rfc3339) -> decoder(calendar:date()).
+full_date_tuple(rfc3339) ->
+  RE =  <<"^([0-9]+)-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])$">>,
+  ToDateTuple =
+    fun (B) ->
+        case re:run(B, RE, [{capture, all_but_first, binary}]) of
+          {match, [Y, M, D]} ->
+            succeed({ erlang:binary_to_integer(Y)
+                    , erlang:binary_to_integer(M)
+                    , erlang:binary_to_integer(D)
+                    });
+          _ ->
+            fail({malformed_date, B})
         end
-      catch
-        error:_ -> error
+    end,
+  ValidateDateTuple =
+    fun (Date = {Y, M, D}) ->
+        case calendar:valid_date(Y, M, D) of
+          true -> succeed(Date);
+          false -> fail({invalid_date, Date})
+        end
+    end,
+  chain( binary()
+       , [ ToDateTuple
+         , ValidateDateTuple
+         ]
+       ).
+
+%% @doc Extracts a raw `jsx:json_term()'
+-spec value() -> decoder(jsx:json_term()).
+value() ->
+  fun (X) -> {ok, X} end.
+
+%% @doc Decoding succeeds if the decoder produces exactly the supplied value.
+%%
+%% This can, for example, be used when a certain field is used to switch between
+%% different decoders.
+-spec exactly(V, decoder(V)) -> decoder(V).
+exactly(V, Decoder) ->
+  fun (Json) ->
+      case Decoder(Json) of
+        {ok, V} -> {ok, V};
+        _       -> {error, {not_exactly, V, Json}}
       end
   end.
 
-is_text() ->
-  fun (X) -> erlang:is_binary(X) end.
-
-is_email() ->
-  fun
-    (T) when is_binary(T) ->
-      match == re:run( T
-                     , <<"^[^@\s]+@([^.@\s]{2,}\.){1,}[a-z]{2,}$">>
-                     , [{capture, none}]
-                     );
-    (_) ->
-      false
+%% @doc Try a bunch of decoders. The first one to succeed will be used.
+%%
+%% If all decoders fails, the errors are accumulated.
+%%
+%% ```
+%%    Dec = dj:one_of([dj:binary(), dj:integer()]),
+%%    {ok, <<"foo">>} = dj:decode(<<"\"foo\"">>, Dec),
+%%    {ok, 123} = dj:decode(<<"123">>, Dec),
+%%    {error, _} = dj:decode(<<"null">>, Dec).
+%% '''
+-spec one_of([decoder(V), ...]) -> decoder(V).
+one_of(Decoders) ->
+  fun (Json) ->
+     try_decoders(Decoders, Json, [])
   end.
 
-any(L) when is_list(L) ->
-  fun (X) -> lists:any(fun id/1, sequence(L, X)) end.
-
-equals(X) ->
-  fun (Y) -> X =:= Y end.
-
-one_of(L) ->
-  fun (X) -> lists:member(X, L) end.
-
-list_of(P) ->
-  fun (L) -> lists:all(P, L) end.
-
-to_atom() ->
-  fun
-    (X) when is_atom(X) ->
-      X;
-    (X) when is_integer(X) ->
-      erlang:binary_to_atom(erlang:integer_to_binary(X), utf8);
-    (X) when is_float(X) ->
-      erlang:binary_to_atom(erlang:float_to_binary(X), utf8);
-    (X) when is_binary(X) ->
-      erlang:binary_to_atom(X, utf8)
+%% @doc Instruct a decoder to match a value in a given field
+%%
+%% ```
+%%    Dec = dj:field(foo, dj:binary()),
+%%    {ok, <<"bar">>} = dj:decode(<<"{\"foo\": \"bar\"}">>, Dec),
+%%
+%%    Error = {unexpected_type, binary, null},
+%%    InField = {in_field, foo, Error},
+%%    {error, InField} = dj:decode(<<"{\"foo\": null}">>, Dec),
+%%
+%%    Missing = {missing_field, foo, #{}},
+%%    {error, Missing} = dj:decode(<<"{}">>, Dec).
+%% '''
+%%
+%% @see at/2
+%% @see prop/2
+%% @see to_map/1
+%% @see prop_list/1
+-spec field(field(), decoder(T)) -> decoder(T).
+field(Field, Decoder) ->
+  fun (#{ Field := Value}) -> in_field(Field, Decoder(Value));
+      (M) when is_map(M)   -> missing_field_error(Field, M);
+      (Json)               -> unexpected_type_error(map, Json)
   end.
 
-to_existing_atom() ->
-  fun
-    (X) when is_atom(X) ->
-      X;
-    (X) when is_integer(X) ->
-      erlang:binary_to_existing_atom(erlang:integer_to_binary(X), utf8);
-    (X) when is_float(X) ->
-      erlang:binary_to_existing_atom(erlang:float_to_binary(X), utf8);
-    (X) when is_binary(X) ->
-      erlang:binary_to_existing_atom(X, utf8)
-  end.
+%% @doc Instruct a decode to match a value in a nested path
+%%
+%% ```
+%%    {ok, null} = dj:decode(<<"null">>, dj:at([], dj:null())).
+%%
+%%    Dec = dj:at([foo, bar], dj:decode(dj:integer())),
+%%    Json = <<"{\"foo\": {\"bar\": 123}}">>,
+%%    {ok, 123} = dj:decode(Json, Dec).
+%% '''
+%%
+%% @see field/2
+%% @see prop/2
+%% @see to_map/1
+%% @see prop_list/1
+-spec at([field()], decoder(T)) -> decoder(T).
+at(Path, Decoder) ->
+  lists:foldr(fun field/2, Decoder, Path).
 
-lift(F) ->
-  fun (X) ->
-      case F(X) of
-        true ->
-          {ok, X};
-        false ->
-          error
+-spec prop(field(), decoder(T)) -> decoder({field(), T}).
+prop(Field, Decoder) ->
+  map(fun (V) -> {Field, V} end, field(Field, Decoder)).
+
+-spec prop_list([{field(), decoder(T)}]) -> decoder([{field(), T}]).
+prop_list(Spec) ->
+  sequence(lists:map(fun ({F, D}) -> prop(F, D) end, Spec)).
+
+-spec to_map(MapSpec) -> decoder(MapResult) when
+    MapSpec :: #{Key := decoder(T)} | [{Key, decoder(T)}],
+    MapResult :: #{Key := T}.
+to_map(Spec) when is_list(Spec) ->
+  Decoders = lists:map(fun({K, Decoder}) ->
+                           map(fun (V) -> {K, V} end, Decoder)
+                       end, Spec),
+  map(fun maps:from_list/1, sequence(Decoders));
+to_map(Spec) when is_map(Spec) ->
+  to_map(maps:to_list(Spec)).
+
+-spec map(fun((A) -> B), decoder(A)) -> decoder(B).
+map(F, Decoder) ->
+  fun (Json) ->
+      case Decoder(Json) of
+        {ok, V} -> {ok, F(V)};
+        Error   -> Error
       end
+  end.
+
+-spec mapn(Fun, [decoder(T)]) -> decoder(V) when
+    Fun :: function(),
+    T   :: term(),
+    V   :: term().
+mapn(Fun, Decoders) ->
+  map(fun (Vs) -> erlang:apply(Fun, Vs) end, sequence(Decoders)).
+
+-spec chain(decoder(A), ToDecoderB) -> decoder(B) when
+    ToDecoderB :: ToDecB | [ToDecB],
+    ToDecB :: fun((A) -> decoder(B)).
+chain(DecoderA, Funs) when is_list(Funs) ->
+  lists:foldl( fun (ToDec, Dec) -> chain(Dec, ToDec) end
+             , DecoderA
+             , Funs
+             );
+chain(DecoderA, ToDecoderB) ->
+  fun (Json) ->
+      case DecoderA(Json) of
+        {ok, V}    -> (ToDecoderB(V))(Json);
+        {error, E} -> {error, E}
+      end
+  end.
+
+-spec fail(E :: term()) -> decoder(V :: term()).
+fail(E) ->
+  fun (_) ->
+      {error, {custom, E}}
+  end.
+
+-spec succeed(T) -> decoder(T).
+succeed(V) ->
+  fun (_) ->
+      {ok, V}
+  end.
+
+-spec sequence([decoder(T)]) -> decoder([T]).
+sequence(Decoders) ->
+  fun (Json) ->
+      Res = lists:foldr(sequence_helper(Json), {ok, []}, Decoders),
+      case Res of
+        {ok, Vs} ->
+          {ok, Vs};
+        {error, [E]} ->
+          {error, E};
+        {error, Es} ->
+          {error, {multiple, Es}}
+      end
+  end.
+
+-spec list(decoder(T)) -> decoder([T]).
+list(Decoder) ->
+  fun (Items) when is_list(Items) -> decode_all(Decoder, Items, 0, {ok, []});
+      (Json)                      -> unexpected_type_error(list, Json)
+  end.
+
+-spec index(non_neg_integer(), decoder(T)) -> decoder(T).
+index(Index, Decoder) ->
+  fun (Items) when is_list(Items) ->
+      case decode_nth(Index, Decoder, Items) of
+        missing    -> {error, {missing_index, Index, Items}};
+        {error, E} -> {error, {at_index, Index, E}};
+        {ok, V}    -> {ok, V}
+      end;
+      (Json) -> unexpected_type_error(list, Json)
   end.
 
 %%%-----------------------------------------------------------------------------
-%%% Internal functions
+%%% Helpers
 %%%-----------------------------------------------------------------------------
 
-compose(Fs) when is_list(Fs) ->
-  lists:foldl(fun compose/2, fun (X) -> X end, Fs).
+-spec try_decoders([decoder(T)], Json, [error()]) -> result(T, error()) when
+    Json :: jsx:json_term().
+try_decoders([], _Json, [E]) ->
+  {error, E};
+try_decoders([], _Json, Es) ->
+  {error, {multiple, Es}};
+try_decoders([Decoder | Decoders], Json, Es) ->
+  case Decoder(Json) of
+    {ok, V} -> {ok, V};
+    {error, E} -> try_decoders(Decoders, Json, [E | Es])
+  end.
 
-compose(F, G) ->
-  fun (X) -> F(G(X)) end.
+-spec decode_nth(non_neg_integer(), decoder(T), [V])
+                -> missing | result(T, error()) when V :: term().
+decode_nth(0,  Decoder, [X | _Xs]) ->
+  Decoder(X);
+decode_nth(_, _Decoder, []) ->
+  missing;
+decode_nth(N, Decoder, [_X | Xs]) ->
+  decode_nth(N - 1, Decoder, Xs).
 
-sequence(Fs, X) ->
-  sequence(Fs, X, []).
+-spec decode_all(decoder(T), [V], non_neg_integer(), ResM) -> Res when
+    ResM :: result([T], [error()]),
+    Res  :: result([T], error()),
+    V    :: jsx:json_term().
+decode_all(_Decoder, [], _Idx, {ok, Vs}) ->
+  {ok, lists:reverse(Vs)};
+decode_all(_Decoder, [], _Idx, {error, [E]}) ->
+  {error, E};
+decode_all(_Decoder, [], _Idx, {error, Es}) ->
+  {error, {multiple, lists:reverse(Es)}};
+decode_all(Decoder, [X | Xs], Idx, {ok, Vs}) ->
+  Res = case Decoder(X) of
+          {ok, V}    -> {ok, [V | Vs]};
+          {error, E} -> {error, [{at_index, Idx, E}]}
+        end,
+  decode_all(Decoder, Xs, Idx + 1, Res);
+decode_all(Decoder, [X | Xs], Idx, {error, Es}) ->
+  Res = case Decoder(X) of
+          {ok, _}    -> {error, Es};
+          {error, E} -> {error, [{at_index, Idx, E} | Es]}
+        end,
+  decode_all(Decoder, Xs, Idx + 1, Res).
 
-sequence([], _, Ys) ->
-  lists:reverse(Ys);
-sequence([F | Fs], X, Ys) ->
-  sequence(Fs, X, [F(X) | Ys]).
+-spec in_field(field(), result(T, E)) -> result(T, E) when
+    T :: term(),
+    E :: error().
+in_field(_, Res = {ok, _}) ->
+  Res;
+in_field(Field, {error, E}) ->
+  {error, {in_field, Field, E}}.
 
-id(X) ->
-  X.
+-spec unexpected_type_error(type(), jsx:json_term()) -> {error, error()}.
+unexpected_type_error(T, Json) ->
+  {error, {unexpected_type, T, Json}}.
+
+-spec missing_field_error(field(), jsx:json_term()) -> {error, error()}.
+missing_field_error(F, Json) ->
+  {error, {missing_field, F, Json}}.
+
+-spec sequence_helper(Json) -> fun((decoder(T), ResXs) -> ResXs) when
+    Json :: jsx:json_text(),
+    T    :: term(),
+    ResXs :: {ok, [V :: term()]} | {error, [E :: error()]}.
+sequence_helper(Json) ->
+  fun (Decoder, Result) ->
+      combine_results(Decoder(Json), Result)
+  end.
+
+-spec combine_results(ResX, ResXs) -> ResXs when
+    ResX :: {ok, V} | {error, E},
+    ResXs :: {ok, [V]} | {error, [E]},
+    V :: term(),
+    E :: error().
+combine_results({error, E}, {error, Es}) ->
+  {error, [E | Es]};
+combine_results({error, E}, {ok, _}) ->
+  {error, [E]};
+combine_results({ok, V}, {ok, Vs}) ->
+  {ok, [V | Vs]};
+combine_results({ok, _}, {error, Es}) ->
+  {error, Es}.
 
 %%%-----------------------------------------------------------------------------
 %%% Tests
@@ -152,68 +633,114 @@ id(X) ->
 -ifdef(TEST).
 
 decode_object_test() ->
-  %% Test simple case
-  Json = <<"{\"foo\": 42, \"date\": \"2001-01-01\", \"baz\": \"quux\", \"scores\": [1,2,3], \"bad_key\": \"bad_value\"}">>,
-  M = #{foo => 42, 
-        bar => -23, 
-        date => {2001,1,1}, 
-        baz => quux, 
-        scores => [1,2,3],
-        hard_set => <<"mine">>
-        },
-  {ok, M} =
-    dj:decode(
-      Json,
-      [ dj:object([{labels, atom}])
-      , dj_maps:filter_keys([foo, bar, baz, date, scores])
-      , dj_maps:is_key(foo)
-      , dj_maps:value_isa(foo, dj_int:is_pos())
-      , dj_maps:put_default(bar, -23)
-      , dj_maps:value_isa(bar, dj_int:is_neg())
-      , dj_maps:is_key(date)
-      , dj_maps:value_isa(date, dj_datetime:is_full_date(rfc3339))
-      , dj_maps:update_with(date, dj_datetime:full_date_to_tuple(rfc3339))
-      , dj_maps:is_key(baz)
-      , dj_maps:value_isa(baz, dj:one_of([<<"quux">>, <<"quuux">>]))
-      , dj_maps:update_with(baz, dj:to_existing_atom())
-      , dj_maps:is_key(scores)
-      , dj_maps:value_isa(scores, dj:list_of(dj_int:is_pos()))
-      , dj_maps:put(hard_set, <<"mine">>)
-      ]
-     ),
-  %% Test error case: invalid JSON
-  error = dj:decode(<<>>, [dj:object()]),
-  %% Test error case: valid JSON, but not an object
-  error = dj:decode(<<"[1, 2, 3]">>, [dj:object()]),
+  Dec = dj:to_map(#{foo => dj:field(foo, dj:binary())}),
+  %% All ok
+  Json1 = <<"{\"foo\": \"bar\"}">>,
+  M = #{foo => <<"bar">>},
+  {ok, M} = dj:decode(Json1, Dec),
+  %% Missing field
+  Json2 = <<"{}">>,
+  ErrMissing = {missing_field, foo, #{}},
+  {error, ErrMissing} = dj:decode(Json2, Dec),
+  %% Expected map
+  Json3 = <<"123">>,
+  WantMap = {unexpected_type, map, 123},
+  {error, WantMap} = dj:decode(Json3, Dec),
+  %% Expected binary
+  Json4 = <<"{\"foo\": []}">>,
+  WantBinary = {unexpected_type, binary, []},
+  InField = {in_field, foo, WantBinary},
+  {error, InField} = dj:decode(Json4, Dec),
   %% Done
   ok.
 
-is_email_test() ->
-  true = (is_email())(<<"michel.rijnders+2@gmx.co.uk">>),
-  ok.
-
-decode_array_test() ->
-  %% Test simple case
-  Json = <<"[1, 2, 3]">>,
-  L = [1, 2, 3],
-  {ok, L} = dj:decode(Json, [dj:array()]),
-  %% Test empty array
-  {ok, []} = dj:decode(<<"[]">>, [dj:array()]),
-  %% Test error case: invalid JSON
-  error = dj:decode(<<>>, [dj:array()]),
-  %% Test error case: valid JSON, but not an array
-  error = dj:decode(<<"{}">>, [dj:array()]),
+decode_list_test() ->
+  Dec = dj:list(dj:binary()),
+  %% All ok
+  Json1 = <<"[\"foo\", \"bar\", \"baz\"]">>,
+  L = [<<"foo">>, <<"bar">>, <<"baz">>],
+  {ok, L} = dj:decode(Json1, Dec),
+  %% Not a list
+  Json2 = <<"{}">>,
+  WantList = {unexpected_type, list, #{}},
+  {error, WantList} = dj:decode(Json2, Dec),
+  %% Not a binary, idx 1
+  Json3 = <<"[\"foo\", 123, \"bar\", \"baz\"]">>,
+  WantBinary = {unexpected_type, binary, 123},
+  AtIndex = {at_index, 1, WantBinary},
+  {error, AtIndex} = dj:decode(Json3, Dec),
   %% Done
   ok.
 
-any_test() ->
-  %% Test simple case
-  Any = any([equals(foo), equals(bar), equals(42)]),
-  true = Any(foo),
-  true = Any(bar),
-  true = Any(42),
-  false = Any(23),
+decode_version_test() ->
+  Version = dj:mapn( fun (X, Y, Z) -> {X, Y, Z} end
+                    , [ dj:index(0, dj:integer())
+                      , dj:index(1, dj:integer())
+                      , dj:index(2, dj:integer())
+                      ]
+                    ),
+  Dec = dj:field(version, Version),
+  %% All ok
+  Json1 = <<"{\"version\": [1, 2, 3]}">>,
+  {ok, {1, 2, 3}} = dj:decode(Json1, Dec),
   %% Done
+  ok.
+
+decode_one_of_test() ->
+  Accept = dj:one_of([ dj:integer()
+                      , dj:exactly(foobar, dj:atom())
+                      ]),
+  Dec = dj:list(Accept),
+  %% All ok
+  Json1 = <<"[123, \"foobar\"]">>,
+  Exp1 = [123, foobar],
+  {ok, Exp1} = dj:decode(Json1, Dec),
+  %% Done
+  ok.
+
+decode_at_test() ->
+  Dec = dj:at([foo, bar], dj:binary()),
+  Json = <<"{\"foo\": {\"bar\": \"baz\"}}">>,
+  {ok, <<"baz">>} = dj:decode(Json, Dec),
+  ok.
+
+decode_one_of_as_default_test() ->
+  Dec = dj:list(dj:one_of([ dj:existing_atom()
+                            , dj:succeed(foobar)
+                            ])),
+  Json = <<"[\"abcde\", \"foo\", \"fghi\", \"bar\"]">>,
+  Exp = [foobar, foo, foobar, bar],
+  {ok, Exp} = dj:decode(Json, Dec),
+  ok.
+
+decode_email_test() ->
+  {ok, _} = dj:decode(<<"\"ilias@truqu.com\"">>, dj:email()),
+  {error, _} = dj:decode(<<"\"foo@bar\"">>, dj:email()),
+  ok.
+
+
+decode_full_object_test() ->
+  Json = << "{\"foo\": 42, \"date\": \"2001-01-01\", "
+          , "\"baz\": \"quux\", \"scores\": [1,2,3], "
+          , "\"bad_key\": \"bad_value\"}"
+         >>,
+  Dec = dj:to_map(#{ foo => dj:field(foo, dj:integer())
+                    , bar => dj:one_of([ dj:field(bar, dj:integer())
+                                        , dj:succeed(-23)
+                                        ])
+                    , date => dj:field(date, dj:full_date_tuple(rfc3339))
+                    , baz => dj:field(baz, dj:existing_atom())
+                    , scores => dj:field(scores, dj:list(dj:integer()))
+                    , hard_set => dj:succeed(<<"mine">>)
+                    }),
+  M = #{ foo => 42
+       , bar => -23
+       , date => {2001, 1, 1}
+       , baz => quux
+       , scores => [1, 2, 3]
+       , hard_set => <<"mine">>
+       },
+  {ok, M} = dj:decode(Json, Dec),
   ok.
 
 -endif.
