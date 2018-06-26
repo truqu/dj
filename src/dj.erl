@@ -477,7 +477,7 @@ map(F, Decoder) ->
     Fun :: function(),
     T   :: term(),
     V   :: term().
-mapn(Fun, Decoders) ->
+mapn(Fun, Decoders) when is_function(Fun, length(Decoders))->
   map(fun (Vs) -> erlang:apply(Fun, Vs) end, sequence(Decoders)).
 
 -spec chain(decoder(A), ToDecoderB) -> decoder(B) when
@@ -721,8 +721,8 @@ decode_email_test() ->
 
 decode_full_object_test() ->
   Json = << "{\"foo\": 42, \"date\": \"2001-01-01\", "
-          , "\"baz\": \"quux\", \"scores\": [1,2,3], "
-          , "\"bad_key\": \"bad_value\"}"
+          , "\"baz\": \"quux\", \"scores\": [1,2,3]"
+          , "}"
          >>,
   Dec = dj:to_map(#{ foo => dj:field(foo, dj:integer())
                     , bar => dj:one_of([ dj:field(bar, dj:integer())
