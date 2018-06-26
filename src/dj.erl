@@ -95,9 +95,9 @@ to_atom() ->
     (X) when is_atom(X) ->
       X;
     (X) when is_integer(X) ->
-      erlang:integer_to_binary(erlang:binary_to_atom(X, utf8));
+      erlang:binary_to_atom(erlang:integer_to_binary(X), utf8);
     (X) when is_float(X) ->
-      erlang:float_to_binary(erlang:binary_to_atom(X, utf8));
+      erlang:binary_to_atom(erlang:float_to_binary(X), utf8);
     (X) when is_binary(X) ->
       erlang:binary_to_atom(X, utf8)
   end.
@@ -107,9 +107,9 @@ to_existing_atom() ->
     (X) when is_atom(X) ->
       X;
     (X) when is_integer(X) ->
-      erlang:integer_to_binary(erlang:binary_to_existing_atom(X, utf8));
+      erlang:binary_to_existing_atom(erlang:integer_to_binary(X), utf8);
     (X) when is_float(X) ->
-      erlang:float_to_binary(erlang:binary_to_existing_atom(X, utf8));
+      erlang:binary_to_existing_atom(erlang:float_to_binary(X), utf8);
     (X) when is_binary(X) ->
       erlang:binary_to_existing_atom(X, utf8)
   end.
