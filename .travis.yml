@@ -6,8 +6,7 @@ before_script:
 env: PATH=".:$PATH"
 script: rebar3 eunit
 otp_release:
-  - 20.0
-  - 19.3
+  - 20.2
 notifications:
   slack:
     secure: mKkICZc0CIwAbjVCanuYI7NH78ZQQcM1O6HsNWu9n6g/j+9OCW2SaOgaXCcLokYaw2PcF1ar58susLuYnTJyq70t050wZ5yTZk7iaqKgqT/h1EBxYJ7u7OL+X9o9gDNkXX5zV275tuCJ3cbVGSSourzGlWdZ/ZF/IiVZpZzvMGHXfbzZBqZwA0UJJxunC3mjf1gJYjv+qQVdSU+PvMKaq4+X0gmcX4GQ20RyKa6T3kyj1oFnbJL63RRwcikqmjBUuvur99r/Nfm0EnEkURGQbMrCPrZ8Iwyz+I+JCm9DDZ2dKBMO1sNLnnjYkiLG4q4VufGLo72hXmIn7onxBt9YWnC0Ppr6+kbOGZyv0mkCxurBCPFfUOko1L0Y/ae3dZCOtYL2Rn71DpxDnw9WS43AM7K2Bp+wv8TfQFjiDFMWK9jsSXlsgVQPbigXCtRwajooRgHI1K39ZpMihQUu4R8Rc3SI+q/9jDCWxTXuySyNF92YyQxbc8jiHt10pWgNpk8kXQoT2YtLu91Mv4p1TqRKoyZVEvYWMCIsHWT8JlUYFUODaUJKb8W2hVhadgufQlrw37Hcn0qOkEY8ZP9uk/485sBUvFIxKMRKn/WL1QGgqF8r0Ry3yLRxGzlR0lwaHvqy4f5Sj53qnmki/b+x/ZPmKk8wv/Ywr4zmeMMAsGVyKvY=
