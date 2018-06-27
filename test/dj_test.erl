@@ -270,6 +270,14 @@ multiple_errors_test() ->
   {error, Errors} = dj:decode(JsonBad, Dec),
   ok.
 
+uuid_test() ->
+  ValidUUID = <<"2e2d65cb-437e-4abf-a7e8-7d97ad9d37a8">>,
+  InvalidUUID = <<"42c1f4f4-a81c-11e7-abc4-cec278b6b50a">>,
+  {ok, ValidUUID} = dj:decode(jsx:encode(ValidUUID), dj:uuid(v4)),
+  {error, [{custom, {invalid_uuid, v4, InvalidUUID}}]} =
+    dj:decode(jsx:encode(InvalidUUID), dj:uuid(v4)),
+  ok.
+
 %% Local variables:
 %% mode: erlang
 %% erlang-indent-level: 2

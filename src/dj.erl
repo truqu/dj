@@ -20,6 +20,7 @@
         , existing_atom/0
         , existing_atom/1
         , full_date_tuple/1
+        , uuid/1
           %% Objects and maps
         , field/2
         , at/2
@@ -362,6 +363,19 @@ full_date_tuple(rfc3339) ->
          , ValidateDateTuple
          ]
        ).
+
+%% @doc Decode a UUIDv4 from a JSON string
+-spec uuid(v4) -> decoder(binary()).
+uuid(v4) ->
+  Re = <<"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$">>,
+  UuidFromBinary =
+    fun (B) ->
+        case re:run(B, Re) of
+          {match, _} -> succeed(B);
+          _          -> fail({invalid_uuid, v4, B})
+        end
+    end,
+  chain(binary(), UuidFromBinary).
 
 %% @doc Extracts a raw `jsx:json_term()'
 -spec value() -> decoder(jsx:json_term()).
