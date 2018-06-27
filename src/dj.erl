@@ -657,14 +657,14 @@ index(Index, Decoder) ->
 %%% Helpers
 %%%-----------------------------------------------------------------------------
 
--spec try_decoders([decoder(T)], Json, [error()]) -> result(T, [error(), ...]) when
-    Json :: jsx:json_term().
+-spec try_decoders([decoder(T)], Json, [error()])
+                  -> result(T, [error(), ...]) when Json :: jsx:json_term().
 try_decoders([], _Json, Es) ->
   {error, Es};
 try_decoders([Decoder | Decoders], Json, Es) ->
   case Decoder(Json) of
     {ok, V} -> {ok, V};
-    {error, E} -> try_decoders(Decoders, Json, E ++ Es)
+    {error, E} -> try_decoders(Decoders, Json, Es ++ E)
   end.
 
 -spec decode_nth(non_neg_integer(), decoder(T), [V])
