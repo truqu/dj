@@ -48,16 +48,15 @@
 %%% Types
 %%%-----------------------------------------------------------------------------
 
--opaque decoder(T) :: fun ((jsx:json_term()) -> result(T, E :: error())).
+-opaque decoder(T) :: fun ((jsx:json_term()) -> result(T, [E :: error(), ...])).
 
 -type result(V, E) :: {ok, V} | {error, E}.
 
 -type error() :: {unexpected_type, ExpectedType :: type(), jsx:json_term()}
                | {missing_field, field(), jsx:json_term()}
                | {missing_index, non_neg_integer(), jsx:json_term()}
-               | {in_field, field(), error()}
-               | {at_index, non_neg_integer(), error()}
-               | {multiple, [error(), ...]}
+               | {in_field, field(), [error(), ...]}
+               | {at_index, non_neg_integer(), [error(), ...]}
                | {custom, any()}
                | {invalid_json, any()}.
 
@@ -86,7 +85,7 @@
 %%%-----------------------------------------------------------------------------
 
 %% @equiv dj:decode(Json, Decoder, [{labels, existing_atom}])
--spec decode(Json, decoder(T)) -> result(T, error()) when
+-spec decode(Json, decoder(T)) -> result(T, [error(), ...]) when
     Json :: jsx:json_text().
 decode(Json, Decoder) ->
   decode(Json, Decoder, [{labels, existing_atom}]).
@@ -110,7 +109,7 @@ decode(Json, Decoder, Opts) ->
     V = jsx:decode(Json, [return_maps | Opts]),
     Decoder(V)
   catch
-    error:_ -> {error, {invalid_json, Json}}
+    error:_ -> {error, [{invalid_json, Json}]}
   end.
 
 %% @doc Decodes a JSON string as a `binary()'.
@@ -378,7 +377,7 @@ exactly(V, Decoder) ->
   fun (Json) ->
       case Decoder(Json) of
         {ok, V} -> {ok, V};
-        _       -> {error, {not_exactly, V, Json}}
+        _       -> {error, [{not_exactly, V, Json}]}
       end
   end.
 
@@ -598,7 +597,7 @@ chain(DecoderA, ToDecoderB) ->
 -spec fail(E :: term()) -> decoder(V :: term()).
 fail(E) ->
   fun (_) ->
-      {error, {custom, E}}
+      {error, [{custom, E}]}
   end.
 
 %% @doc Create a decoder that always succeeds with the provided term
@@ -632,15 +631,7 @@ succeed(V) ->
 -spec sequence([decoder(T)]) -> decoder([T]).
 sequence(Decoders) ->
   fun (Json) ->
-      Res = lists:foldr(sequence_helper(Json), {ok, []}, Decoders),
-      case Res of
-        {ok, Vs} ->
-          {ok, Vs};
-        {error, [E]} ->
-          {error, E};
-        {error, Es} ->
-          {error, {multiple, Es}}
-      end
+      lists:foldr(sequence_helper(Json), {ok, []}, Decoders)
   end.
 
 %% @doc Decode a JSON list using a decoder
@@ -655,8 +646,8 @@ list(Decoder) ->
 index(Index, Decoder) ->
   fun (Items) when is_list(Items) ->
       case decode_nth(Index, Decoder, Items) of
-        missing    -> {error, {missing_index, Index, Items}};
-        {error, E} -> {error, {at_index, Index, E}};
+        missing    -> {error, [{missing_index, Index, Items}]};
+        {error, E} -> {error, [{at_index, Index, E}]};
         {ok, V}    -> {ok, V}
       end;
       (Json) -> unexpected_type_error(list, Json)
@@ -666,16 +657,14 @@ index(Index, Decoder) ->
 %%% Helpers
 %%%-----------------------------------------------------------------------------
 
--spec try_decoders([decoder(T)], Json, [error()]) -> result(T, error()) when
+-spec try_decoders([decoder(T)], Json, [error()]) -> result(T, [error(), ...]) when
     Json :: jsx:json_term().
-try_decoders([], _Json, [E]) ->
-  {error, E};
 try_decoders([], _Json, Es) ->
-  {error, {multiple, Es}};
+  {error, Es};
 try_decoders([Decoder | Decoders], Json, Es) ->
   case Decoder(Json) of
     {ok, V} -> {ok, V};
-    {error, E} -> try_decoders(Decoders, Json, [E | Es])
+    {error, E} -> try_decoders(Decoders, Json, E ++ Es)
   end.
 
 -spec decode_nth(non_neg_integer(), decoder(T), [V])
@@ -693,10 +682,8 @@ decode_nth(N, Decoder, [_X | Xs]) ->
     V    :: jsx:json_term().
 decode_all(_Decoder, [], _Idx, {ok, Vs}) ->
   {ok, lists:reverse(Vs)};
-decode_all(_Decoder, [], _Idx, {error, [E]}) ->
-  {error, E};
 decode_all(_Decoder, [], _Idx, {error, Es}) ->
-  {error, {multiple, lists:reverse(Es)}};
+  {error, lists:reverse(Es)};
 decode_all(Decoder, [X | Xs], Idx, {ok, Vs}) ->
   Res = case Decoder(X) of
           {ok, V}    -> {ok, [V | Vs]};
@@ -712,38 +699,42 @@ decode_all(Decoder, [X | Xs], Idx, {error, Es}) ->
 
 -spec in_field(field(), result(T, E)) -> result(T, E) when
     T :: term(),
-    E :: error().
+    E :: [error(), ...].
 in_field(_, Res = {ok, _}) ->
   Res;
 in_field(Field, {error, E}) ->
-  {error, {in_field, Field, E}}.
+  {error, [{in_field, Field, E}]}.
 
--spec unexpected_type_error(type(), jsx:json_term()) -> {error, error()}.
+-spec unexpected_type_error(type(), jsx:json_term()) -> {error, [error(), ...]}.
 unexpected_type_error(T, Json) ->
-  {error, {unexpected_type, T, Json}}.
+  make_error({unexpected_type, T, Json}).
 
--spec missing_field_error(field(), jsx:json_term()) -> {error, error()}.
+-spec missing_field_error(field(), jsx:json_term()) -> {error, [error(), ...]}.
 missing_field_error(F, Json) ->
-  {error, {missing_field, F, Json}}.
+  make_error({missing_field, F, Json}).
+
+-spec make_error(error()) -> {error, [error(), ...]}.
+make_error(E) ->
+  {error, [E]}.
 
 -spec sequence_helper(Json) -> fun((decoder(T), ResXs) -> ResXs) when
     Json :: jsx:json_text(),
     T    :: term(),
-    ResXs :: {ok, [V :: term()]} | {error, [E :: error()]}.
+    ResXs :: {ok, [V :: term()]} | {error, [E :: error(), ...]}.
 sequence_helper(Json) ->
   fun (Decoder, Result) ->
       combine_results(Decoder(Json), Result)
   end.
 
 -spec combine_results(ResX, ResXs) -> ResXs when
-    ResX :: {ok, V} | {error, E},
-    ResXs :: {ok, [V]} | {error, [E]},
+    ResX :: {ok, V} | {error, [E, ...]},
+    ResXs :: {ok, [V]} | {error, [E, ...]},
     V :: term(),
     E :: error().
 combine_results({error, E}, {error, Es}) ->
-  {error, [E | Es]};
+  {error, E ++ Es};
 combine_results({error, E}, {ok, _}) ->
-  {error, [E]};
+  {error, E};
 combine_results({ok, V}, {ok, Vs}) ->
   {ok, [V | Vs]};
 combine_results({ok, _}, {error, Es}) ->

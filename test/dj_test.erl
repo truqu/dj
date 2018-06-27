@@ -15,16 +15,16 @@ decode_object_test() ->
   %% Missing field
   Json2 = <<"{}">>,
   ErrMissing = {missing_field, foo, #{}},
-  {error, ErrMissing} = dj:decode(Json2, Dec),
+  {error, [ErrMissing]} = dj:decode(Json2, Dec),
   %% Expected map
   Json3 = <<"123">>,
   WantMap = {unexpected_type, map, 123},
-  {error, WantMap} = dj:decode(Json3, Dec),
+  {error, [WantMap]} = dj:decode(Json3, Dec),
   %% Expected binary
   Json4 = <<"{\"foo\": []}">>,
   WantBinary = {unexpected_type, binary, []},
-  InField = {in_field, foo, WantBinary},
-  {error, InField} = dj:decode(Json4, Dec),
+  InField = {in_field, foo, [WantBinary]},
+  {error, [InField]} = dj:decode(Json4, Dec),
   %% Done
   ok.
 
@@ -37,12 +37,12 @@ decode_list_test() ->
   %% Not a list
   Json2 = <<"{}">>,
   WantList = {unexpected_type, list, #{}},
-  {error, WantList} = dj:decode(Json2, Dec),
+  {error, [WantList]} = dj:decode(Json2, Dec),
   %% Not a binary, idx 1
   Json3 = <<"[\"foo\", 123, \"bar\", \"baz\"]">>,
   WantBinary = {unexpected_type, binary, 123},
-  AtIndex = {at_index, 1, WantBinary},
-  {error, AtIndex} = dj:decode(Json3, Dec),
+  AtIndex = {at_index, 1, [WantBinary]},
+  {error, [AtIndex]} = dj:decode(Json3, Dec),
   %% Done
   ok.
 
