@@ -278,6 +278,11 @@ uuid_test() ->
     dj:decode(jsx:encode(InvalidUUID), dj:uuid(v4)),
   ok.
 
+set_test() ->
+  Exp = sets:from_list([1, 2, 7, 99]),
+  {ok, Exp} = dj:decode(<<"[1, 2, 7, 99]">>, dj:set(dj:integer())),
+  ok.
+
 %% Local variables:
 %% mode: erlang
 %% erlang-indent-level: 2

@@ -31,6 +31,7 @@
         , list/1
         , index/2
         , sequence/1
+        , set/1
           %% Manipulating decoders
         , map/2
         , chain/2
@@ -499,6 +500,11 @@ sequence(Decoders) ->
   fun (Json) ->
       lists:foldr(sequence_helper(Json), {ok, []}, Decoders)
   end.
+
+%% @doc Decode a JSON list into an erlang `sets:set(T)'
+-spec set(decoder(T)) -> decoder(sets:set((T))).
+set(Decoder) ->
+  map(fun (Xs) -> sets:from_list(Xs) end, list(Decoder)).
 
 %% @doc Manipulate the values produced by a decoder with a function
 %%
