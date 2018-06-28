@@ -29,6 +29,7 @@
         , to_map/1
           %% Lists
         , list/1
+        , nonempty_list/1
         , index/2
         , sequence/1
         , set/1
@@ -102,7 +103,8 @@
               | boolean
               | float
               | map
-              | list.
+              | list
+              | nonempty_list.
 %% These may appear in `unexpected_type' errors.
 
 -type field() :: atom() | binary().
@@ -480,6 +482,13 @@ to_map(Spec) when is_map(Spec) ->
 list(Decoder) ->
   fun (Items) when is_list(Items) -> decode_all(Decoder, Items, 0, {ok, []});
       (Json)                      -> unexpected_type_error(list, Json)
+  end.
+
+%% @doc Decode a nonempty JSON list into a nonempty list `[T, ..]'
+-spec nonempty_list(T) -> decoder([T, ...]).
+nonempty_list(Decoder) ->
+  fun (Json = [_X|_Xs]) -> decode_all(Decoder, Json, 0, {ok, []});
+      (Json)            -> unexpected_type_error(nonempty_list, Json)
   end.
 
 %% @doc Decode a single index in a JSON list using the specified decoder

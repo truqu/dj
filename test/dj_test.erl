@@ -283,6 +283,12 @@ set_test() ->
   {ok, Exp} = dj:decode(<<"[1, 2, 7, 99]">>, dj:set(dj:integer())),
   ok.
 
+nonempty_list_test() ->
+  {ok, [foo]} = dj:decode(<<"[null]">>, dj:nonempty_list(dj:null(foo))),
+  {error, [{unexpected_type, nonempty_list, []}]} =
+    dj:decode(<<"[]">>, dj:nonempty_list(dj:null(foo))),
+  ok.
+
 %% Local variables:
 %% mode: erlang
 %% erlang-indent-level: 2
