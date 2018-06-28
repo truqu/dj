@@ -49,7 +49,7 @@
 %%% Types
 %%%-----------------------------------------------------------------------------
 
--opaque decoder(T) :: fun ((jsx:json_term()) -> result(T, [E :: error(), ...])).
+-opaque decoder(T) :: fun ((jsx:json_term()) -> result(T, errors())).
 %% A `decoder(T)' is an opaque datastructure that represents a composable
 %% decoder. After composing a decoder for your JSON and final datastructure, you
 %% can run it with {@link decode/2} or {@link decode/3}.
@@ -86,6 +86,9 @@
 %% If the actual JSON cannot be parsed by jsx, an `invalid_json' error is
 %% produced.
 
+-type errors() :: [error(), ...].
+%% A nonempty list of {@link error/0}s
+
 -type type() :: binary
               | integer
               | pos_integer
@@ -107,6 +110,7 @@
 -export_type([ decoder/1
              , result/2
              , error/0
+             , errors/0
              , type/0
              , field/0
              ]).
@@ -671,7 +675,7 @@ one_of(Decoders) ->
   end.
 
 %% @equiv dj:decode(Json, Decoder, [{labels, existing_atom}])
--spec decode(Json, decoder(T)) -> result(T, [error(), ...]) when
+-spec decode(Json, decoder(T)) -> result(T, errors()) when
     Json :: jsx:json_text().
 decode(Json, Decoder) ->
   decode(Json, Decoder, [{labels, existing_atom}]).
@@ -687,7 +691,7 @@ decode(Json, Decoder) ->
 %%
 %% Use of the functions that create {@type decoder(T)}s and functions that help
 %% with composition are discussed individually.
--spec decode(Json, decoder(T), Opts) -> result(T, error()) when
+-spec decode(Json, decoder(T), Opts) -> result(T, errors()) when
     Json :: jsx:json_text(),
     Opts :: [term()].
 decode(Json, Decoder, Opts) ->
@@ -703,7 +707,7 @@ decode(Json, Decoder, Opts) ->
 %%%-----------------------------------------------------------------------------
 
 -spec try_decoders([decoder(T)], Json, [error()])
-                  -> result(T, [error(), ...]) when Json :: jsx:json_term().
+                  -> result(T, errors()) when Json :: jsx:json_term().
 try_decoders([], _Json, Es) ->
   {error, Es};
 try_decoders([Decoder | Decoders], Json, Es) ->
@@ -744,38 +748,37 @@ decode_all(Decoder, [X | Xs], Idx, {error, Es}) ->
 
 -spec in_field(field(), result(T, E)) -> result(T, E) when
     T :: term(),
-    E :: [error(), ...].
+    E :: errors().
 in_field(_, Res = {ok, _}) ->
   Res;
 in_field(Field, {error, E}) ->
   {error, [{in_field, Field, E}]}.
 
--spec unexpected_type_error(type(), jsx:json_term()) -> {error, [error(), ...]}.
+-spec unexpected_type_error(type(), jsx:json_term()) -> {error, errors()}.
 unexpected_type_error(T, Json) ->
   make_error({unexpected_type, T, Json}).
 
--spec missing_field_error(field(), jsx:json_term()) -> {error, [error(), ...]}.
+-spec missing_field_error(field(), jsx:json_term()) -> {error, errors()}.
 missing_field_error(F, Json) ->
   make_error({missing_field, F, Json}).
 
--spec make_error(error()) -> {error, [error(), ...]}.
+-spec make_error(error()) -> {error, errors()}.
 make_error(E) ->
   {error, [E]}.
 
 -spec sequence_helper(Json) -> fun((decoder(T), ResXs) -> ResXs) when
     Json :: jsx:json_text(),
     T    :: term(),
-    ResXs :: {ok, [V :: term()]} | {error, [E :: error(), ...]}.
+    ResXs :: {ok, [V :: term()]} | {error, errors()}.
 sequence_helper(Json) ->
   fun (Decoder, Result) ->
       combine_results(Decoder(Json), Result)
   end.
 
 -spec combine_results(ResX, ResXs) -> ResXs when
-    ResX :: {ok, V} | {error, [E, ...]},
-    ResXs :: {ok, [V]} | {error, [E, ...]},
-    V :: term(),
-    E :: error().
+    ResX :: {ok, V} | {error, errors()},
+    ResXs :: {ok, [V]} | {error, errors()},
+    V :: term().
 combine_results({error, E}, {error, Es}) ->
   {error, E ++ Es};
 combine_results({error, E}, {ok, _}) ->
