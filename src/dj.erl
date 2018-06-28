@@ -49,10 +49,13 @@
 %%% Types
 %%%-----------------------------------------------------------------------------
 
--opaque decoder(T) :: fun ((jsx:json_term()) -> result(T, errors())).
+-type decoder(T) :: fun ((jsx:json_term()) -> result(T, errors())).
 %% A `decoder(T)' is an opaque datastructure that represents a composable
 %% decoder. After composing a decoder for your JSON and final datastructure, you
 %% can run it with {@link decode/2} or {@link decode/3}.
+%%
+%% Consider `decoder(T)' an opaque datastructure. It is only exposed due to
+%% dialyzer limitations.
 
 -type result(V, E) :: {ok, V} | {error, E}.
 %% Running a decoder results in a `result', indicating either success (and
