@@ -692,11 +692,11 @@ one_of(Decoders) ->
       try_decoders(Decoders, Json, [])
   end.
 
-%% @equiv dj:decode(Json, Decoder, [{labels, existing_atom}])
+%% @equiv dj:decode(Json, Decoder, [{labels, attempt_atom}])
 -spec decode(Json, decoder(T)) -> result(T, errors()) when
     Json :: jsx:json_text().
 decode(Json, Decoder) ->
-  decode(Json, Decoder, [{labels, existing_atom}]).
+  decode(Json, Decoder, [{labels, attempt_atom}]).
 
 %% @doc Run a {@type decoder(T)} against arbirary JSON.
 %%
