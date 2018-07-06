@@ -289,6 +289,24 @@ nonempty_list_test() ->
     dj:decode(<<"[]">>, dj:nonempty_list(dj:null(foo))),
   ok.
 
+throwing_decoders_are_not_caught_test() ->
+  Dec = dj:map(fun (_) -> throw(foobar) end, dj:null()),
+  ?assertThrow(foobar, dj:decode(<<"null">>, Dec)).
+
+mapn_arity_mismatch_test() ->
+  Dec = dj:mapn( fun (X, Y) -> {X, Y, 0} end
+               , [ dj:field(major, dj:pos_integer())
+                 , dj:field(minor, dj:non_neg_integer())
+                 , dj:field(patch, dj:non_neg_integer())
+                 ]
+               ),
+  Json = << "{ \"major\": 123"
+          , ", \"minor\": 66"
+          , ", \"patch\": 0"
+          , "}">>,
+  {error, [{custom, {arity_mismatch, 3, 2}}]} = dj:decode(Json, Dec),
+  ok.
+
 %% Local variables:
 %% mode: erlang
 %% erlang-indent-level: 2

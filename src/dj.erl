@@ -654,6 +654,24 @@ succeed(V) ->
 %%    {ok, {123, 66, 0}} = dj:decode(Json, Dec).
 %% '''
 %%
+%% When the arity doesn't match, a custom error is returned with the expected
+%% arity (based on the number of decoders passed) and the actual arity of the
+%% passed function.
+%%
+%% ```
+%%    Dec = dj:mapn( fun (X, Y) -> {X, Y, 0} end
+%%                 , [ dj:field(major, dj:pos_integer())
+%%                   , dj:field(minor, dj:non_neg_integer())
+%%                   , dj:field(patch, dj:non_neg_integer())
+%%                   ]
+%%                 ),
+%%    Json = << "{ \"major\": 123"
+%%            , ", \"minor\": 66"
+%%            , ", \"patch\": 0"
+%%            , "}">>,
+%%    {error, [{custom, {arity_mismatch, 3, 2}}]} = dj:decode(Json, Dec).
+%% '''
+%%
 %% @see map/2
 %% @see chain/2
 -spec mapn(Fun, [decoder(T)]) -> decoder(V) when
@@ -661,7 +679,10 @@ succeed(V) ->
     T   :: term(),
     V   :: term().
 mapn(Fun, Decoders) when is_function(Fun, length(Decoders))->
-  map(fun (Vs) -> erlang:apply(Fun, Vs) end, sequence(Decoders)).
+  map(fun (Vs) -> erlang:apply(Fun, Vs) end, sequence(Decoders));
+mapn(Fun, Decoders) ->
+  {arity, Actual} = erlang:fun_info(Fun, arity),
+  fail({arity_mismatch, length(Decoders), Actual}).
 
 %% @doc Decoding succeeds if the decoder produces exactly the supplied value.
 %%
