@@ -713,16 +713,27 @@ decode(Json, Decoder) ->
     Json :: jsx:json_text(),
     Opts :: [term()].
 decode(Json, Decoder, Opts) ->
-  try
-    V = jsx:decode(Json, [return_maps | Opts]),
-    Decoder(V)
-  catch
-    error:_ -> {error, [{invalid_json, Json}]}
+  case attempt_jsx_decode(Json, Opts) of
+    {ok, Data}       -> Decoder(Data);
+    {error, _} = Res -> Res
   end.
 
 %%%-----------------------------------------------------------------------------
 %%% Helpers
 %%%-----------------------------------------------------------------------------
+
+-spec attempt_jsx_decode(Json, Opts) -> result(Data, Invalid) when
+    Json    :: binary(),
+    Invalid :: [{invalid_json, Json}],
+    Data    :: jsx:json_term(),
+    Opts    :: [term()].
+attempt_jsx_decode(Json, Opts) ->
+  try
+    V = jsx:decode(Json, [return_maps | Opts]),
+    {ok, V}
+  catch
+    error:_ -> {error, [{invalid_json, Json}]}
+  end.
 
 -spec try_decoders([decoder(T)], Json, [error()])
                   -> result(T, errors()) when Json :: jsx:json_term().
