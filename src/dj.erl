@@ -731,8 +731,15 @@ decode(Json, Decoder) ->
 %% Use of the functions that create {@type decoder(T)}s and functions that help
 %% with composition are discussed individually.
 -spec decode(Json, decoder(T), Opts) -> result(T, errors()) when
-    Json :: jsx:json_text(),
-    Opts :: [term()].
+    Json     :: jsx:json_text(),
+    Opts     :: [Opt],
+    Opt      :: jsx:option()
+              | labels
+              | {labels, LabelOpt},
+    LabelOpt :: atom
+              | attempt_atom
+              | binary
+              | existing_atom.
 decode(Json, Decoder, Opts) ->
   case attempt_jsx_decode(Json, Opts) of
     {ok, Data}       -> Decoder(Data);
