@@ -12,5 +12,7 @@
                    ]
     }
   , {env,[]}
+  , {licenses, ["https://github.com/truqu/dj/blob/develop/LICENSE"]}
+  , {links, [{"GitHub", "https://github.com/truqu/dj"}]}
   ]
 }.
