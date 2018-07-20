@@ -307,6 +307,19 @@ mapn_arity_mismatch_test() ->
   {error, [{custom, {arity_mismatch, 3, 2}}]} = dj:decode(Json, Dec),
   ok.
 
+bounded_integer_test() ->
+  Dec1 = dj:integer(-5, 5),
+  Dec2 = dj:integer(5, -5),
+  {ok, -5} = dj:decode(<<"-5">>, Dec1),
+  {ok, -5} = dj:decode(<<"-5">>, Dec2),
+  {ok, 0} = dj:decode(<<"0">>, Dec1),
+  {ok, 0} = dj:decode(<<"0">>, Dec2),
+  {ok, 5} = dj:decode(<<"5">>, Dec1),
+  {ok, 5} = dj:decode(<<"5">>, Dec2),
+  {error, _} = dj:decode(<<"-6">>, Dec1),
+  {error, _} = dj:decode(<<"6">>, Dec2),
+  ok.
+
 %% Local variables:
 %% mode: erlang
 %% erlang-indent-level: 2
