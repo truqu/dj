@@ -400,7 +400,7 @@ uuid(v4) ->
 %% @doc Decode a bounded integer from JSON
 %%
 %% Occasionally, you may want to decode a JSON integer only when it sits between
-%% certain bounds.
+%% certain bounds. Both the upper and lower bound are inclusive.
 %%
 %% ```
 %%    -spec score() -> dj:decoder(1..10)
@@ -419,7 +419,7 @@ integer(Min, Max) when Max < Min ->
   integer(Max, Min);
 integer(Min, Max) ->
   CheckBounds =
-    fun (Int) when Min =< Int andalso Int =< Max -> succeed(Int);
+    fun (Int) when Int >= Min andalso Int =< Max -> succeed(Int);
         (Int) -> fail({integer_out_of_bounds, Min, Max, Int})
     end,
   chain(integer(), CheckBounds).
