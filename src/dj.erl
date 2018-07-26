@@ -21,6 +21,7 @@
         , email/0
         , full_date_tuple/1
         , uuid/1
+        , integer/2
           %% Objects and maps
         , field/2
         , at/2
@@ -159,6 +160,7 @@ binary() ->
 %% @see pos_integer/0
 %% @see neg_integer/0
 %% @see non_neg_integer/0
+%% @see integer/2
 -spec integer() -> decoder(integer()).
 integer() ->
   fun (Json) when is_integer(Json) -> {ok, Json};
@@ -394,6 +396,33 @@ uuid(v4) ->
         end
     end,
   chain(binary(), UuidFromBinary).
+
+%% @doc Decode a bounded integer from JSON
+%%
+%% Occasionally, you may want to decode a JSON integer only when it sits between
+%% certain bounds. Both the upper and lower bound are inclusive.
+%%
+%% ```
+%%    -spec score() -> dj:decoder(1..10)
+%%    score() ->
+%%        dj:integer(1, 10).
+%%
+%%    {ok, 5} = dj:decode(<<"5">>, score()).
+%%
+%%    E = {custom, {integer_out_of_bounds, 1, 10, 0}},
+%%    {error, [E]} = dj:decode(<<"0", score()).
+%% '''
+%%
+%% @see integer/0
+-spec integer(Min :: integer(), Max :: integer()) -> decoder(integer()).
+integer(Min, Max) when Max < Min ->
+  integer(Max, Min);
+integer(Min, Max) ->
+  CheckBounds =
+    fun (Int) when Int >= Min andalso Int =< Max -> succeed(Int);
+        (Int) -> fail({integer_out_of_bounds, Min, Max, Int})
+    end,
+  chain(integer(), CheckBounds).
 
 %% @doc Instruct a decoder to match a value in a given field
 %%
