@@ -6,7 +6,6 @@ before_script:
 env: PATH=".:$PATH"
 script: rebar3 check
 otp_release:
-  - 20.2
   - 22.0
 notifications:
   slack:
