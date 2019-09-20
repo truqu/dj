@@ -743,7 +743,7 @@ one_of(Decoders) ->
   end.
 
 %% @equiv dj:decode(Json, Decoder, [{labels, attempt_atom}])
--spec decode(Json, decoder(T)) -> result(T, errors()) when
+-spec decode(Json, decoder(T)) -> result(T, {dj_error, errors()}) when
     Json :: jsx:json_text().
 decode(Json, Decoder) ->
   decode(Json, Decoder, [{labels, attempt_atom}]).
@@ -759,7 +759,7 @@ decode(Json, Decoder) ->
 %%
 %% Use of the functions that create {@type decoder(T)}s and functions that help
 %% with composition are discussed individually.
--spec decode(Json, decoder(T), Opts) -> result(T, errors()) when
+-spec decode(Json, decoder(T), Opts) -> result(T, {dj_error, errors()}) when
     Json     :: jsx:json_text(),
     Opts     :: [Opt],
     Opt      :: jsx:option()
@@ -771,8 +771,14 @@ decode(Json, Decoder) ->
               | existing_atom.
 decode(Json, Decoder, Opts) ->
   case attempt_jsx_decode(Json, Opts) of
-    {ok, Data}       -> Decoder(Data);
-    {error, _} = Res -> Res
+    {ok, Data} ->
+      case Decoder(Data) of
+        {ok, _} = R ->
+          R;
+        {error, E} ->
+          {error, {dj_error, E}}
+      end;
+    {error, E} -> {error, {dj_error, E}}
   end.
 
 %%%-----------------------------------------------------------------------------
