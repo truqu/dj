@@ -139,7 +139,7 @@
 %% `jsx:json_term()'.
 %%
 %% ```
-%%    {error, {unexpected_type, binary, 123}} =
+%%    {error, {dj_errors, [{unexpected_type, binary, 123}]}} =
 %%        dj:decode(<<"123">>, dj:binary()).
 %% '''
 -spec binary() -> decoder(binary()).
@@ -152,7 +152,7 @@ binary() ->
 %%
 %% ```
 %%    {ok, 123} = dj:decode(<<"123">>, dj:integer()).
-%%    {error, {unexpected_type, integer, true}} =
+%%    {error, {dj_errors, [{unexpected_type, integer, true}]}} =
 %%        dj:decode(<<"true">>, dj:integer()).
 %% '''
 %%
@@ -339,7 +339,7 @@ existing_atom(Allowed) ->
 %% `not_an_email' error.
 %%
 %% ```
-%%    E = {custom, {not_an_email, <<"foo@bar">>}},
+%%    E = {dj_errors, [{custom, {not_an_email, <<"foo@bar">>}}]},
 %%    {error, E} = dj:decode(<<"\"foo@bar\"">>, dj:email()).
 %% '''
 -spec email() -> decoder(binary()).
@@ -409,8 +409,8 @@ uuid(v4) ->
 %%
 %%    {ok, 5} = dj:decode(<<"5">>, score()).
 %%
-%%    E = {custom, {integer_out_of_bounds, 1, 10, 0}},
-%%    {error, [E]} = dj:decode(<<"0", score()).
+%%    E = {dj_errors, [{custom, {integer_out_of_bounds, 1, 10, 0}}]},
+%%    {error, E} = dj:decode(<<"0", score()).
 %% '''
 %%
 %% @see integer/0
@@ -432,10 +432,10 @@ integer(Min, Max) ->
 %%
 %%    Error = {unexpected_type, binary, null},
 %%    InField = {in_field, foo, Error},
-%%    {error, InField} = dj:decode(<<"{\"foo\": null}">>, Dec),
+%%    {error, {dj_errors, [InField]}} = dj:decode(<<"{\"foo\": null}">>, Dec),
 %%
 %%    Missing = {missing_field, foo, #{}},
-%%    {error, Missing} = dj:decode(<<"{}">>, Dec).
+%%    {error, {dj_erros, [Missing]}} = dj:decode(<<"{}">>, Dec).
 %% '''
 %%
 %% @see at/2
@@ -627,7 +627,8 @@ chain(DecoderA, ToDecoderB) ->
 %%
 %% ```
 %%    Dec = dj:fail(no_more_bananas),
-%%    {error, {custom, no_more_bananas}} = dj:decode(<<"true">>, Dec).
+%%    {error, {dj_errors, [{custom, no_more_bananas}]}}
+%%      = dj:decode(<<"true">>, Dec).
 %% '''
 %%
 %% Mostly useful when combined with `chain'.
@@ -698,7 +699,8 @@ succeed(V) ->
 %%            , ", \"minor\": 66"
 %%            , ", \"patch\": 0"
 %%            , "}">>,
-%%    {error, [{custom, {arity_mismatch, 3, 2}}]} = dj:decode(Json, Dec).
+%%    {error, {dj_errors, [{custom, {arity_mismatch, 3, 2}}]}}
+%%      = dj:decode(Json, Dec).
 %% '''
 %%
 %% @see map/2
