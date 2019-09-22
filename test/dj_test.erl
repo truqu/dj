@@ -7,7 +7,7 @@
 %%%-----------------------------------------------------------------------------
 
 invalid_json_test() ->
-  {error, [{invalid_json, <<>>}]} = dj:decode(<<>>, dj:null()),
+  {error, {dj_error, [{invalid_json, <<>>}]}} = dj:decode(<<>>, dj:null()),
   ok.
 
 decode_object_test() ->
@@ -19,16 +19,16 @@ decode_object_test() ->
   %% Missing field
   Json2 = <<"{}">>,
   ErrMissing = {missing_field, foo, #{}},
-  {error, [ErrMissing]} = dj:decode(Json2, Dec),
+  {error, {dj_error, [ErrMissing]}} = dj:decode(Json2, Dec),
   %% Expected map
   Json3 = <<"123">>,
   WantMap = {unexpected_type, map, 123},
-  {error, [WantMap]} = dj:decode(Json3, Dec),
+  {error, {dj_error, [WantMap]}} = dj:decode(Json3, Dec),
   %% Expected binary
   Json4 = <<"{\"foo\": []}">>,
   WantBinary = {unexpected_type, binary, []},
   InField = {in_field, foo, [WantBinary]},
-  {error, [InField]} = dj:decode(Json4, Dec),
+  {error, {dj_error, [InField]}} = dj:decode(Json4, Dec),
   %% Done
   ok.
 
@@ -41,12 +41,12 @@ decode_list_test() ->
   %% Not a list
   Json2 = <<"{}">>,
   WantList = {unexpected_type, list, #{}},
-  {error, [WantList]} = dj:decode(Json2, Dec),
+  {error, {dj_error, [WantList]}} = dj:decode(Json2, Dec),
   %% Not a binary, idx 1
   Json3 = <<"[\"foo\", 123, \"bar\", \"baz\"]">>,
   WantBinary = {unexpected_type, binary, 123},
   AtIndex = {at_index, 1, [WantBinary]},
-  {error, [AtIndex]} = dj:decode(Json3, Dec),
+  {error, {dj_error, [AtIndex]}} = dj:decode(Json3, Dec),
   %% Done
   ok.
 
@@ -123,48 +123,48 @@ decode_full_object_test() ->
 
 integer_test() ->
   {ok, 123} = dj:decode(<<"123">>, dj:integer()),
-  {error, [{unexpected_type, integer, 0.1}]} =
+  {error, {dj_error, [{unexpected_type, integer, 0.1}]}} =
     dj:decode(<<"0.1">>, dj:integer()),
   ok.
 
 pos_integer_test() ->
   {ok, 123} = dj:decode(<<"123">>, dj:pos_integer()),
-  {error, [{unexpected_type, pos_integer, 0}]} =
+  {error, {dj_error, [{unexpected_type, pos_integer, 0}]}} =
     dj:decode(<<"0">>, dj:pos_integer()),
-  {error, [{unexpected_type, pos_integer, -1}]} =
+  {error, {dj_error, [{unexpected_type, pos_integer, -1}]}} =
     dj:decode(<<"-1">>, dj:pos_integer()),
   ok.
 
 neg_integer_test() ->
   {ok, -12} = dj:decode(<<"-12">>, dj:neg_integer()),
-  {error, [{unexpected_type, neg_integer, 0}]} =
+  {error, {dj_error, [{unexpected_type, neg_integer, 0}]}} =
     dj:decode(<<"0">>, dj:neg_integer()),
-  {error, [{unexpected_type, neg_integer, 1}]} =
+  {error, {dj_error, [{unexpected_type, neg_integer, 1}]}} =
     dj:decode(<<"1">>, dj:neg_integer()),
   ok.
 
 non_neg_integer_test() ->
   {ok, 123} = dj:decode(<<"123">>, dj:non_neg_integer()),
   {ok, 0} = dj:decode(<<"0">>, dj:non_neg_integer()),
-  {error, [{unexpected_type, non_neg_integer, -1}]} =
+  {error, {dj_error, [{unexpected_type, non_neg_integer, -1}]}} =
     dj:decode(<<"-1">>, dj:non_neg_integer()),
   ok.
 
 float_test() ->
   {ok, 0.1} = dj:decode(<<"0.1">>, dj:float()),
   {ok, 123.0} = dj:decode(<<"123">>, dj:float()),
-  {error, [{unexpected_type, float, <<>>}]} = dj:decode(<<"\"\"">>, dj:float()),
+  {error, {dj_error, [{unexpected_type, float, <<>>}]}} = dj:decode(<<"\"\"">>, dj:float()),
   ok.
 
 null_test() ->
   {ok, foo} = dj:decode(<<"null">>, dj:null(foo)),
-  {error, [{unexpected_type, null, true}]} = dj:decode(<<"true">>, dj:null()),
+  {error, {dj_error, [{unexpected_type, null, true}]}} = dj:decode(<<"true">>, dj:null()),
   ok.
 
 boolean_test() ->
   {ok, true} = dj:decode(<<"true">>, dj:boolean()),
   {ok, false} = dj:decode(<<"false">>, dj:boolean()),
-  {error, [{unexpected_type, boolean, null}]} =
+  {error, {dj_error, [{unexpected_type, boolean, null}]}} =
     dj:decode(<<"null">>, dj:boolean()),
   ok.
 
@@ -174,21 +174,21 @@ atom_test() ->
   {ok, null} = dj:decode(<<"null">>, dj:atom()),
   {ok, true} = dj:decode(<<"true">>, dj:atom()),
   {ok, false} = dj:decode(<<"false">>, dj:atom()),
-  {error, [{custom, {not_an_atom, 123}}]} = dj:decode(<<"123">>, dj:atom()),
+  {error, {dj_error, [{custom, {not_an_atom, 123}}]}} = dj:decode(<<"123">>, dj:atom()),
   %% atom/1
   {ok, foo} = dj:decode(<<"\"foo\"">>, dj:atom([foo, bar])),
-  {error, [ {not_exactly, foo, true}
-          , {not_exactly, bar, true}
-          ]
-  } = dj:decode(<<"true">>, dj:atom([foo, bar])),
+  {error, {dj_error, [ {not_exactly, foo, true}
+                     , {not_exactly, bar, true}
+                     ]
+          }} = dj:decode(<<"true">>, dj:atom([foo, bar])),
   ok.
 
 existing_atom_test() ->
   %% existing_atom/0
   {ok, foo} = dj:decode(<<"\"foo\"">>, dj:existing_atom()),
-  {error, [{custom, {not_an_atom, <<"not an existing atom">>}}]} =
+  {error, {dj_error, [{custom, {not_an_atom, <<"not an existing atom">>}}]}} =
     dj:decode(<<"\"not an existing atom\"">>, dj:existing_atom()),
-  {error, [{custom, {not_an_atom, []}}]} =
+  {error, {dj_error, [{custom, {not_an_atom, []}}]}} =
     dj:decode(<<"[]">>, dj:existing_atom()),
   %% existing_atom/1
   {ok, foo} = dj:decode(<<"\"foo\"">>, dj:existing_atom([foo])),
@@ -197,9 +197,9 @@ existing_atom_test() ->
 full_date_tuple_test() ->
   Dec = dj:full_date_tuple(rfc3339),
   {ok, {2018, 6, 27}} = dj:decode(<<"\"2018-06-27\"">>, Dec),
-  {error, [{custom, {malformed_date, <<"foo">>}}]} =
+  {error, {dj_error, [{custom, {malformed_date, <<"foo">>}}]}} =
     dj:decode(<<"\"foo\"">>, Dec),
-  {error, [{custom, {invalid_date, {2018, 2, 31}}}]} =
+  {error, {dj_error, [{custom, {invalid_date, {2018, 2, 31}}}]}} =
     dj:decode(<<"\"2018-02-31\"">>, Dec),
   ok.
 
@@ -222,23 +222,23 @@ prop_list_test() ->
 
 index_test() ->
   {ok, 123} = dj:decode(<<"[true, 123, false]">>, dj:index(1, dj:integer())),
-  {error, [{missing_index, 1, []}]} =
+  {error, {dj_error, [{missing_index, 1, []}]}} =
     dj:decode(<<"[]">>, dj:index(1, dj:null())),
-  {error, [{at_index, 0, [{unexpected_type, null, true}]}]} =
+  {error, {dj_error, [{at_index, 0, [{unexpected_type, null, true}]}]}} =
     dj:decode(<<"[true]">>, dj:index(0, dj:null())),
-  {error, [{unexpected_type, list, #{}}]} =
+  {error, {dj_error, [{unexpected_type, list, #{}}]}} =
     dj:decode(<<"{}">>, dj:index(0, dj:null())),
   ok.
 
 list_test() ->
   Dec = dj:list(dj:integer()),
   {ok, [1, 2, 3]} = dj:decode(<<"[1, 2, 3]">>, Dec),
-  {error, [{at_index, 2, [{unexpected_type, integer, true}]}]} =
+  {error, {dj_error, [{at_index, 2, [{unexpected_type, integer, true}]}]}} =
     dj:decode(<<"[1, 2, true]">>, Dec),
-  {error, [ {at_index, 0, [{unexpected_type, integer, true}]}
-          , {at_index, 1, [{unexpected_type, integer, false}]}
-          , {at_index, 3, [{unexpected_type, integer, null}]}
-          ]
+  {error, {dj_error, [ {at_index, 0, [{unexpected_type, integer, true}]}
+                     , {at_index, 1, [{unexpected_type, integer, false}]}
+                     , {at_index, 3, [{unexpected_type, integer, null}]}
+                     ]}
   } = dj:decode(<<"[true, false, 12, null]">>, Dec),
   ok.
 
@@ -267,14 +267,14 @@ multiple_errors_test() ->
            , {in_field, foo, [{unexpected_type, pos_integer, -20}]}
            , {in_field, a, [{in_field, b, [{unexpected_type, binary, null}]}]}
            ],
-  {error, Errors} = dj:decode(JsonBad, Dec),
+  {error, {dj_error, Errors}} = dj:decode(JsonBad, Dec),
   ok.
 
 uuid_test() ->
   ValidUUID = <<"2e2d65cb-437e-4abf-a7e8-7d97ad9d37a8">>,
   InvalidUUID = <<"42c1f4f4-a81c-11e7-abc4-cec278b6b50a">>,
   {ok, ValidUUID} = dj:decode(jsx:encode(ValidUUID), dj:uuid(v4)),
-  {error, [{custom, {invalid_uuid, v4, InvalidUUID}}]} =
+  {error, {dj_error, [{custom, {invalid_uuid, v4, InvalidUUID}}]}} =
     dj:decode(jsx:encode(InvalidUUID), dj:uuid(v4)),
   ok.
 
@@ -285,7 +285,7 @@ set_test() ->
 
 nonempty_list_test() ->
   {ok, [foo]} = dj:decode(<<"[null]">>, dj:nonempty_list(dj:null(foo))),
-  {error, [{unexpected_type, nonempty_list, []}]} =
+  {error, {dj_error, [{unexpected_type, nonempty_list, []}]}} =
     dj:decode(<<"[]">>, dj:nonempty_list(dj:null(foo))),
   ok.
 
@@ -304,7 +304,20 @@ mapn_arity_mismatch_test() ->
           , ", \"minor\": 66"
           , ", \"patch\": 0"
           , "}">>,
-  {error, [{custom, {arity_mismatch, 3, 2}}]} = dj:decode(Json, Dec),
+  {error, {dj_error, [{custom, {arity_mismatch, 3, 2}}]}} = dj:decode(Json, Dec),
+  ok.
+
+bounded_integer_test() ->
+  Dec1 = dj:integer(-5, 5),
+  Dec2 = dj:integer(5, -5),
+  {ok, -5} = dj:decode(<<"-5">>, Dec1),
+  {ok, -5} = dj:decode(<<"-5">>, Dec2),
+  {ok, 0} = dj:decode(<<"0">>, Dec1),
+  {ok, 0} = dj:decode(<<"0">>, Dec2),
+  {ok, 5} = dj:decode(<<"5">>, Dec1),
+  {ok, 5} = dj:decode(<<"5">>, Dec2),
+  {error, _} = dj:decode(<<"-6">>, Dec1),
+  {error, _} = dj:decode(<<"6">>, Dec2),
   ok.
 
 %% Local variables:

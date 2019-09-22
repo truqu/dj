@@ -21,6 +21,7 @@
         , email/0
         , full_date_tuple/1
         , uuid/1
+        , integer/2
           %% Objects and maps
         , field/2
         , at/2
@@ -138,7 +139,7 @@
 %% `jsx:json_term()'.
 %%
 %% ```
-%%    {error, {unexpected_type, binary, 123}} =
+%%    {error, {dj_errors, [{unexpected_type, binary, 123}]}} =
 %%        dj:decode(<<"123">>, dj:binary()).
 %% '''
 -spec binary() -> decoder(binary()).
@@ -151,7 +152,7 @@ binary() ->
 %%
 %% ```
 %%    {ok, 123} = dj:decode(<<"123">>, dj:integer()).
-%%    {error, {unexpected_type, integer, true}} =
+%%    {error, {dj_errors, [{unexpected_type, integer, true}]}} =
 %%        dj:decode(<<"true">>, dj:integer()).
 %% '''
 %%
@@ -159,6 +160,7 @@ binary() ->
 %% @see pos_integer/0
 %% @see neg_integer/0
 %% @see non_neg_integer/0
+%% @see integer/2
 -spec integer() -> decoder(integer()).
 integer() ->
   fun (Json) when is_integer(Json) -> {ok, Json};
@@ -337,7 +339,7 @@ existing_atom(Allowed) ->
 %% `not_an_email' error.
 %%
 %% ```
-%%    E = {custom, {not_an_email, <<"foo@bar">>}},
+%%    E = {dj_errors, [{custom, {not_an_email, <<"foo@bar">>}}]},
 %%    {error, E} = dj:decode(<<"\"foo@bar\"">>, dj:email()).
 %% '''
 -spec email() -> decoder(binary()).
@@ -395,6 +397,33 @@ uuid(v4) ->
     end,
   chain(binary(), UuidFromBinary).
 
+%% @doc Decode a bounded integer from JSON
+%%
+%% Occasionally, you may want to decode a JSON integer only when it sits between
+%% certain bounds. Both the upper and lower bound are inclusive.
+%%
+%% ```
+%%    -spec score() -> dj:decoder(1..10)
+%%    score() ->
+%%        dj:integer(1, 10).
+%%
+%%    {ok, 5} = dj:decode(<<"5">>, score()).
+%%
+%%    E = {dj_errors, [{custom, {integer_out_of_bounds, 1, 10, 0}}]},
+%%    {error, E} = dj:decode(<<"0", score()).
+%% '''
+%%
+%% @see integer/0
+-spec integer(Min :: integer(), Max :: integer()) -> decoder(integer()).
+integer(Min, Max) when Max < Min ->
+  integer(Max, Min);
+integer(Min, Max) ->
+  CheckBounds =
+    fun (Int) when Int >= Min andalso Int =< Max -> succeed(Int);
+        (Int) -> fail({integer_out_of_bounds, Min, Max, Int})
+    end,
+  chain(integer(), CheckBounds).
+
 %% @doc Instruct a decoder to match a value in a given field
 %%
 %% ```
@@ -403,10 +432,10 @@ uuid(v4) ->
 %%
 %%    Error = {unexpected_type, binary, null},
 %%    InField = {in_field, foo, Error},
-%%    {error, InField} = dj:decode(<<"{\"foo\": null}">>, Dec),
+%%    {error, {dj_errors, [InField]}} = dj:decode(<<"{\"foo\": null}">>, Dec),
 %%
 %%    Missing = {missing_field, foo, #{}},
-%%    {error, Missing} = dj:decode(<<"{}">>, Dec).
+%%    {error, {dj_erros, [Missing]}} = dj:decode(<<"{}">>, Dec).
 %% '''
 %%
 %% @see at/2
@@ -598,7 +627,8 @@ chain(DecoderA, ToDecoderB) ->
 %%
 %% ```
 %%    Dec = dj:fail(no_more_bananas),
-%%    {error, {custom, no_more_bananas}} = dj:decode(<<"true">>, Dec).
+%%    {error, {dj_errors, [{custom, no_more_bananas}]}}
+%%      = dj:decode(<<"true">>, Dec).
 %% '''
 %%
 %% Mostly useful when combined with `chain'.
@@ -669,7 +699,8 @@ succeed(V) ->
 %%            , ", \"minor\": 66"
 %%            , ", \"patch\": 0"
 %%            , "}">>,
-%%    {error, [{custom, {arity_mismatch, 3, 2}}]} = dj:decode(Json, Dec).
+%%    {error, {dj_errors, [{custom, {arity_mismatch, 3, 2}}]}}
+%%      = dj:decode(Json, Dec).
 %% '''
 %%
 %% @see map/2
@@ -714,7 +745,7 @@ one_of(Decoders) ->
   end.
 
 %% @equiv dj:decode(Json, Decoder, [{labels, attempt_atom}])
--spec decode(Json, decoder(T)) -> result(T, errors()) when
+-spec decode(Json, decoder(T)) -> result(T, {dj_error, errors()}) when
     Json :: jsx:json_text().
 decode(Json, Decoder) ->
   decode(Json, Decoder, [{labels, attempt_atom}]).
@@ -730,7 +761,7 @@ decode(Json, Decoder) ->
 %%
 %% Use of the functions that create {@type decoder(T)}s and functions that help
 %% with composition are discussed individually.
--spec decode(Json, decoder(T), Opts) -> result(T, errors()) when
+-spec decode(Json, decoder(T), Opts) -> result(T, {dj_error, errors()}) when
     Json     :: jsx:json_text(),
     Opts     :: [Opt],
     Opt      :: jsx:option()
@@ -742,8 +773,14 @@ decode(Json, Decoder) ->
               | existing_atom.
 decode(Json, Decoder, Opts) ->
   case attempt_jsx_decode(Json, Opts) of
-    {ok, Data}       -> Decoder(Data);
-    {error, _} = Res -> Res
+    {ok, Data} ->
+      case Decoder(Data) of
+        {ok, _} = R ->
+          R;
+        {error, E} ->
+          {error, {dj_error, E}}
+      end;
+    {error, E} -> {error, {dj_error, E}}
   end.
 
 %%%-----------------------------------------------------------------------------
