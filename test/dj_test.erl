@@ -96,6 +96,33 @@ decode_email_test() ->
   {error, _} = dj:decode(<<"\"foo@bar\"">>, dj:email()),
   ok.
 
+nullable_test() ->
+  Dec = dj:nullable(dj:integer(1, 10)),
+  {ok, 5} = dj:decode(<<"5">>, Dec),
+  {ok, null} = dj:decode(<<"null">>, Dec),
+  E = {dj_error, [ {unexpected_type, integer, true}
+                 , {unexpected_type, null, true}
+                 ]},
+  {error, E} = dj:decode(<<"true">>, Dec).
+
+nullable_with_default_test() ->
+  Dec = dj:nullable(dj:integer(1, 10), 5),
+  {ok, 4} = dj:decode(<<"4">>, Dec),
+  {ok, 5} = dj:decode(<<"null">>, Dec),
+  E = {dj_error, [ {unexpected_type, integer, true}
+                 , {unexpected_type, null, true}
+                 ]},
+  {error, E} = dj:decode(<<"true">>, Dec).
+
+optional_field_test() ->
+  Dec = dj:optional_field(foo, dj:binary(), <<"default">>),
+  {ok, <<"bar">>} = dj:decode(<<"{\"foo\": \"bar\"}">>, Dec),
+  {ok, <<"default">>} = dj:decode(<<"{}">>, Dec),
+  Error = {unexpected_type, binary, null},
+  InField = {in_field, foo, [Error]},
+  {error, {dj_error, [InField]}} = dj:decode(<<"{\"foo\": null}">>, Dec),
+  NotMap = {unexpected_type, map, <<"foo">>},
+  {error, {dj_error, [NotMap]}} = dj:decode(<<"\"foo\"">>, Dec).
 
 decode_full_object_test() ->
   Json = << "{\"foo\": 42, \"date\": \"2001-01-01\", "
