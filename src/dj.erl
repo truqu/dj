@@ -22,8 +22,11 @@
         , full_date_tuple/1
         , uuid/1
         , integer/2
+        , nullable/1
+        , nullable/2
           %% Objects and maps
         , field/2
+        , optional_field/3
         , at/2
         , prop/2
         , prop_list/1
@@ -424,6 +427,56 @@ integer(Min, Max) ->
     end,
   chain(integer(), CheckBounds).
 
+%% @doc Decode a nullable value
+%%
+%% Sometimes, we explicitly want to allow `null'. In such a case, making that
+%% clear by wrapping a decoder with `nullable/1' can help readability.
+%%
+%% ```
+%%    -spec score() -> dj:decoder(1..10)
+%%    score() ->
+%%        dj:integer(1, 10).
+%%
+%%    {ok, 5} = dj:decode(<<"5">>, nullable(score())).
+%%    {ok, null} = dj:decode(<<"null">>, nullable(score())).
+%%
+%%    E = {dj_error, [ {unexpected_type, integer, true}
+%%                   , {unexpected_type, null, true}
+%%                   ]},
+%%    {error, E} = dj:decode(<<"true", nullable(score())).
+%% '''
+%%
+%% @equiv nullable(Decoder, null)
+-spec nullable(decoder(T)) -> decoder(T | null).
+nullable(Decoder) ->
+  nullable(Decoder, null).
+
+%% @doc Decode a nullable value
+%%
+%% Sometimes, we explicitly want to allow `null' but use a default value. In
+%% such a case, making that clear by wrapping a decoder with `nullable/2' can
+%% help readability.
+%%
+%% ```
+%%    -spec score() -> dj:decoder(1..10)
+%%    score() ->
+%%        dj:integer(1, 10).
+%%
+%%    {ok, 4} = dj:decode(<<"4">>, nullable(score(), 5)).
+%%    {ok, 5} = dj:decode(<<"null">>, nullable(score(), 5)).
+%%
+%%    E = {dj_error, [ {unexpected_type, integer, true}
+%%                   , {unexpected_type, null, true}
+%%                   ]},
+%%    {error, E} = dj:decode(<<"true", nullable(score(), 5)).
+%% '''
+%%
+%% @equiv nullable(Decoder, null)
+
+-spec nullable(decoder(T), V) -> decoder(T | V).
+nullable(Decoder, Default) ->
+  one_of([Decoder, null(Default)]).
+
 %% @doc Instruct a decoder to match a value in a given field
 %%
 %% ```
@@ -444,9 +497,35 @@ integer(Min, Max) ->
 %% @see prop_list/1
 -spec field(field(), decoder(T)) -> decoder(T).
 field(Field, Decoder) ->
-  fun (#{ Field := Value}) -> in_field(Field, Decoder(Value));
-      (M) when is_map(M)   -> missing_field_error(Field, M);
-      (Json)               -> unexpected_type_error(map, Json)
+  fun (#{Field := Value}) -> in_field(Field, Decoder(Value));
+      (M) when is_map(M)  -> missing_field_error(Field, M);
+      (Json)              -> unexpected_type_error(map, Json)
+  end.
+
+%% @doc Decodes a field or uses a default value when the field is missing
+%%
+%% Note that if the field is present but malformed according to the decoder,
+%% decoding will fail. If we're not working in the context of a map/object,
+%% decoding also fails.
+%%
+%% ```
+%%    Dec = dj:optional_field(foo, dj:binary(), <<"default">>),
+%%
+%%    {ok, <<"bar">>} = dj:decode(<<"{\"foo\": \"bar\"}">>, Dec),
+%%    {ok, <<"default">>} = dj:decode(<<"{}">>, Dec),
+%%
+%%    Error = {unexpected_type, binary, null},
+%%    InField = {in_field, foo, [Error]},
+%%    {error, {dj_error, [InField]}} = dj:decode(<<"{\"foo\": null}">>, Dec),
+%%
+%%    NotMap = {unexpected_type, map, <<"foo">>},
+%%    {error, {dj_error, [NotMap]}} = dj:decode(<<"\"foo\"">>, Dec).
+%% '''
+-spec optional_field(field(), decoder(T), V) -> decoder(T | V).
+optional_field(Field, Decoder, Default) ->
+  fun (#{Field := Value}) -> in_field(Field, Decoder(Value));
+      (M) when is_map(M)  -> {ok, Default};
+      (Json)              -> unexpected_type_error(map, Json)
   end.
 
 %% @doc Instruct a decode to match a value in a nested path
