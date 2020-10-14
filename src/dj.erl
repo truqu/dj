@@ -347,7 +347,7 @@ existing_atom(Allowed) ->
 %% '''
 -spec email() -> decoder(binary()).
 email() ->
-  chain( binary()
+  chain( map(fun string:lowercase/1, binary())
        , fun (V) ->
              case re:run( V
                         , <<"^[^@\s]+@([^.@\s]{2,}\.){1,}[a-z]{2,}$">>
