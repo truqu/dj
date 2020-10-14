@@ -3,7 +3,7 @@
 { application
 , dj
 , [ {description, "Library for decoding JSON"}
-  , {vsn, "0.2.1"}
+  , {vsn, "0.3.0"}
   , {modules, []}
   , {registered, []}
   , {applications, [ kernel
