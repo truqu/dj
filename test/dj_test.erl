@@ -92,7 +92,8 @@ decode_one_of_as_default_test() ->
   ok.
 
 decode_email_test() ->
-  {ok, _} = dj:decode(<<"\"ilias@truqu.com\"">>, dj:email()),
+  {ok, <<"ilias@truqu.com">>} = dj:decode(<<"\"ilias@truqu.com\"">>, dj:email()),
+  {ok, <<"ilias@truqu.com">>} = dj:decode(<<"\"ILIAS@TRUQU.COM\"">>, dj:email()),
   {error, _} = dj:decode(<<"\"foo@bar\"">>, dj:email()),
   ok.
 
